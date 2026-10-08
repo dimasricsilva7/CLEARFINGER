@@ -248,8 +248,17 @@ export function MediaModal({ open, onClose, onSelect, category }: { open: boolea
  *  2. "Usar URL"       — cola o link https da imagem; guarda uma cópia no site (recomendado) ou usa o link direto.
  * Também abre a biblioteca para reaproveitar imagens já enviadas. A URL escolhida vai num input hidden.
  */
-export function ImageField({ name, label, defaultValue = "", category, hint }: { name: string; label: string; defaultValue?: string; category?: string; hint?: string }) {
+export function ImageField({ name, label, defaultValue = "", category, hint, onChange }: { name: string; label: string; defaultValue?: string; category?: string; hint?: string; onChange?: (url: string) => void }) {
   const [url, setUrl] = useState(defaultValue);
+  const changed = useRef(false);
+  useEffect(() => {
+    if (!changed.current) {
+      changed.current = true;
+      return;
+    }
+    onChange?.(url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
   const [open, setOpen] = useState(false);
   const [showUrl, setShowUrl] = useState(false);
   const [link, setLink] = useState("");
@@ -306,7 +315,7 @@ export function ImageField({ name, label, defaultValue = "", category, hint }: {
       className={`rounded-lg ${drag ? "ring-2 ring-blue-400 ring-offset-2" : ""}`}
     >
       <label className={labelCls}>{label}</label>
-      <input type="hidden" name={name} value={url} />
+      {name && <input type="hidden" name={name} value={url} />}
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif" className="hidden" onChange={(e) => sendFile(e.target.files?.[0])} />
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50">

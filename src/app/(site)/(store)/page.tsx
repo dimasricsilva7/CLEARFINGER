@@ -24,7 +24,7 @@ export default async function Home() {
     const last = opts.at(-1);
     return last ? `ou ${last.label} no ${cfg.methodLabel.toLowerCase()}` : null;
   };
-  const ctx: LandingCtx = { product, faqs, testimonials, crediarioHint, pixLabel: isOn(s.pix_enabled) ? s.pix_method_label || "PIX" : null };
+  const ctx: LandingCtx = { product, faqs, testimonials, crediarioHint, pixLabel: isOn(s.pix_enabled) ? s.pix_method_label || "PIX" : null, shipping: isOn(s.shipping_free_enabled) ? { label: s.shipping_label, eta: s.shipping_eta } : null };
 
   const visible = sections.filter((x) => isVisible(x, ctx));
   const tones = assignTones(visible);

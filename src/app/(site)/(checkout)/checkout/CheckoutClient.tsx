@@ -29,6 +29,9 @@ export type CheckoutProps = {
   initialOfferId: string;
   shippingCents: number;
   shippingLabel: string;
+  shippingEta: string;
+  bumpTitle: string;
+  bumpText: string;
   shippingNote: string;
   requireCpf: boolean;
   consentLabel: string;
@@ -287,9 +290,18 @@ export function CheckoutClient(p: CheckoutProps) {
           <span className="font-display text-[1.75rem] font-semibold tabular-nums tracking-tight text-navy">{formatBRL(totalCents)}</span>
         </div>
         {method === "CREDIARIO" && <p className="rounded-lg bg-mist/70 px-3 py-2 text-[13px] font-semibold text-navy">{p.crediario.methodLabel} em {cred.installments}x</p>}
+        {(p.shippingLabel || p.shippingEta) && (
+          <div className="flex items-center gap-3 rounded-xl bg-success/[0.08] px-3 py-2.5 ring-1 ring-success/20" data-testid="shipping-strip">
+            <Icon name="truck" className="h-5 w-5 shrink-0 text-success" />
+            <p className="text-[12px] font-bold uppercase leading-snug tracking-wide text-navy">
+              {p.shippingLabel}
+              {p.shippingEta && <span className="block font-semibold text-muted">Entrega de {p.shippingEta}</span>}
+            </p>
+          </div>
+        )}
       </div>
     ),
-    [offer, chosenBumps, p.shippingCents, savings, totalCents, method, cred.installments, p.crediario.methodLabel]
+    [offer, chosenBumps, p.shippingCents, p.shippingLabel, p.shippingEta, savings, totalCents, method, cred.installments, p.crediario.methodLabel]
   );
 
   const legal = (
@@ -315,7 +327,7 @@ export function CheckoutClient(p: CheckoutProps) {
 
         {/* Produto e kit */}
         <section className="card overflow-hidden" aria-labelledby="h-pedido">
-          <div className="grid items-center gap-2 bg-gradient-to-b from-mist to-surface px-4 pt-4 sm:grid-cols-[200px_1fr] sm:gap-5 sm:p-5">
+          <div className="grid items-center gap-2 bg-white px-4 pt-4 sm:grid-cols-[200px_1fr] sm:gap-5 sm:p-5">
             {p.imageUrl && (
               <Stage className="mx-auto aspect-[1/0.85] w-full max-w-[15rem] sm:max-w-none">
                 <ProductStack src={p.imageUrl} alt={p.productName} count={offer.quantity} className="absolute inset-x-0 bottom-[6%] top-[4%]" priority />
@@ -392,6 +404,7 @@ export function CheckoutClient(p: CheckoutProps) {
             <StepTitle n={2} title="Entrega" id="h-entrega" done={addrDone} />
             {p.shippingCents === 0 && <span className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-bold text-success">Frete grátis</span>}
           </div>
+          {p.shippingEta && <p className="col-span-6 -mt-1 text-sm font-medium text-navy">Entrega estimada em {p.shippingEta} após a confirmação do pagamento.</p>}
           {p.shippingNote && <p className="col-span-6 -mt-1 text-sm text-muted">{p.shippingNote}</p>}
           <Field id="cep" label={cepLoading ? "CEP (buscando…)" : "CEP"} error={errors.cep} className="col-span-6 sm:col-span-3">
             <input id="cep" value={form.cep} onChange={(e) => { set("cep", maskCep(e.target.value)); if (onlyDigits(e.target.value).length === 8) lookupCep(e.target.value); }} autoComplete="postal-code" inputMode="numeric" placeholder="00000-000" className="input" {...inv("cep")} />
@@ -423,8 +436,8 @@ export function CheckoutClient(p: CheckoutProps) {
         {p.bumps.length > 0 && (
           <section className="space-y-3" aria-labelledby="h-extras">
             <div className="px-1">
-              <h2 id="h-extras" className="text-lg font-semibold text-navy">Aproveite e leve junto</h2>
-              <p className="text-sm text-muted">Ofertas exclusivas deste pedido. Marque se quiser adicionar.</p>
+              <h2 id="h-extras" className="text-lg font-semibold text-navy">{p.bumpTitle}</h2>
+              {p.bumpText && <p className="text-sm text-muted">{p.bumpText}</p>}
             </div>
             {p.bumps.map((b) => {
               const on = bumpIds.includes(b.id);
@@ -442,7 +455,7 @@ export function CheckoutClient(p: CheckoutProps) {
                     {on && <Icon name="check" className="h-4 w-4" strokeWidth={3} />}
                   </span>
                   {b.imageUrl && (
-                    <span className="relative h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-gradient-to-b from-mist to-surface sm:h-20 sm:w-20">
+                    <span className="relative h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-white sm:h-20 sm:w-20">
                       <ProductStack src={b.imageUrl} alt="" count={b.quantity} className="absolute inset-1" />
                     </span>
                   )}
@@ -520,7 +533,7 @@ export function CheckoutClient(p: CheckoutProps) {
           {[
             ["lock", "Compra segura"],
             ["shield", "Dados protegidos"],
-            ["truck", p.shippingLabel || "Entrega com acompanhamento"],
+            ["truck", p.shippingEta ? `Entrega em ${p.shippingEta}` : p.shippingLabel || "Entrega com acompanhamento"],
           ].map(([i, t]) => (
             <li key={t} className="flex flex-col items-center gap-1.5 rounded-xl bg-surface p-3 ring-1 ring-line">
               <Icon name={i} className="h-5 w-5 text-primary" />
@@ -534,7 +547,7 @@ export function CheckoutClient(p: CheckoutProps) {
       <aside className="hidden lg:sticky lg:top-24 lg:block">
         <div className="card overflow-hidden">
           {p.imageUrl && (
-            <div className="bg-gradient-to-b from-mist to-surface px-6 pt-6">
+            <div className="bg-white px-6 pt-6">
               <Stage className="mx-auto aspect-[1/0.8] w-full max-w-[16rem]">
                 <ProductStack src={p.imageUrl} alt="" count={offer.quantity} className="absolute inset-x-0 bottom-[6%] top-[4%]" />
               </Stage>

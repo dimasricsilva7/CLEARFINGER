@@ -14,10 +14,11 @@ import { classifyChannel, parseUserAgent } from "@/utils/channel";
 import { linkSessionToCustomer, trackServerEvent } from "@/lib/analytics";
 import { sendCapiEvent, fbcFromClickId } from "@/lib/meta/capi";
 import { findSellableOffer } from "@/server/catalog";
-import { getSettingsFresh, isOn, settingInt } from "@/server/settings";
+import { publicTimeline, syncOrderTracking } from "@/server/delivery";
+import { getSettingsFresh, isOn, settingInt, shippingCentsFrom } from "@/server/settings";
 import type { CheckoutInput } from "@/lib/validation";
 import type { ClientContext } from "@/types/tracking";
-import type { PublicOrder } from "@/types/order";
+import type { PublicOrder, PublicUpsell } from "@/types/order";
 
 export class CheckoutError extends Error {
   constructor(
@@ -122,7 +123,7 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
     : [];
   if (bumps.length !== bumpIds.length) throw new CheckoutError("Uma das ofertas adicionais não está mais disponível. Revise o pedido.", 409);
 
-  const shippingCents = Math.max(0, settingInt(settings, "shipping_flat_cents", 0));
+  const shippingCents = shippingCentsFrom(settings);
   const totals = computeTotals([{ unitPriceCents: offer.priceCents, quantity }, ...bumps.map((b) => ({ unitPriceCents: b.priceCents, quantity: 1 }))], shippingCents);
   if (method === "PIX" && totals.totalCents < MIN_PIX_CENTS) throw new CheckoutError("O valor mínimo para pagamento via PIX é R$ 5,00.");
   if (isOn(settings.require_cpf) && !input.customer.cpf) throw new CheckoutError("Confira os dados informados.", 422, { "customer.cpf": "Informe seu CPF" });
@@ -452,6 +453,9 @@ async function onConfirmed(orderId: string) {
   const tracked = await db.order.updateMany({ where: { id: order.id, purchaseTrackedAt: null }, data: { purchaseTrackedAt: new Date() } });
   if (!tracked.count) return;
 
+  // etapa 1 da linha do tempo de entrega ("Pagamento concluído") na hora da confirmação
+  await syncOrderTracking(order).catch((e) => log.error("tracking", "falha ao iniciar linha do tempo", { order: order.id, error: e instanceof Error ? e.message : String(e) }));
+
   for (const item of order.items) {
     if (item.productId && item.product?.stockQuantity != null) {
       await db.product.update({ where: { id: item.productId }, data: { stockQuantity: { decrement: item.quantity * item.unitsPerOffer } } }).catch(() => {});
@@ -649,4 +653,145 @@ export function toPublicOrder(o: AccessOrder): PublicOrder {
     crediario: o.crediario ? { installments: o.crediario.installments, installmentLabel: o.crediario.installmentLabel, methodLabel: o.crediario.methodLabel } : null,
     items: o.items.map((i) => ({ name: i.productName, offerName: i.offerName, kind: i.kind, quantity: i.quantity, units: i.unitsPerOffer, unitPriceCents: i.unitPriceCents, totalPriceCents: i.totalPriceCents })),
   };
+}
+
+// ───────────────────────── Upsell (pós-compra) ─────────────────────────
+
+type UpsellEligible = Pick<Order, "id" | "status" | "paymentMethod" | "source">;
+
+function triggerMatches(trigger: string, o: UpsellEligible) {
+  const pixPaid = o.paymentMethod === "PIX" && o.status === "PAID";
+  const crediario = o.paymentMethod === "CREDIARIO" && ["CREDIARIO_PENDENTE", "CREDIARIO_EM_ANALISE", "CREDIARIO_APROVADO", "CREDIARIO_CONCLUIDO"].includes(o.status);
+  if (trigger === "PIX_PAID") return pixPaid;
+  if (trigger === "CREDIARIO_CREATED") return crediario;
+  return pixPaid || crediario;
+}
+
+/** Upsell a exibir neste pedido (um por pedido). Nunca em pedidos que já são upsell nem depois de aceito/recusado. */
+export async function upsellForOrder(o: UpsellEligible): Promise<PublicUpsell | null> {
+  if (o.source === "UPSELL") return null;
+  const [answered, child] = await Promise.all([
+    db.upsellEvent.count({ where: { orderId: o.id, action: { in: ["ACCEPT", "DECLINE"] } } }),
+    db.order.count({ where: { parentOrderId: o.id } }),
+  ]);
+  if (answered || child) return null;
+  const list = await db.upsell.findMany({
+    where: { active: true, priceCents: { gt: 0 }, product: { active: true } },
+    include: { product: { include: { images: { where: { role: "MAIN" }, take: 1 } } } },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+  const u = list.find((x) => triggerMatches(x.trigger, o));
+  if (!u) return null;
+  return {
+    id: u.id,
+    title: u.title,
+    description: u.description,
+    productName: u.product.shortName || u.product.name,
+    quantity: u.quantity,
+    priceCents: u.priceCents,
+    compareAtPriceCents: u.compareAtPriceCents,
+    imageUrl: u.imageUrl || u.product.images[0]?.url || null,
+    badge: u.badge,
+    acceptLabel: u.acceptLabel,
+    declineLabel: u.declineLabel,
+    position: u.position === "BOTTOM" ? "BOTTOM" : "TOP",
+  };
+}
+
+export async function recordUpsellEvent(upsellId: string, orderId: string, action: "VIEW" | "ACCEPT" | "DECLINE") {
+  await db.upsellEvent.create({ data: { upsellId, orderId, action } }).catch(() => null); // único por (upsell, pedido, ação)
+}
+
+/**
+ * Aceite do upsell: cria um NOVO pedido PIX vinculado ao original (mesmo cliente, endereço e atribuição).
+ * O pedido original não é alterado — se algo falhar aqui, ele segue intacto.
+ */
+export async function acceptUpsell(parent: Order, upsellId: string) {
+  const offer = await upsellForOrder(parent);
+  if (!offer || offer.id !== upsellId) throw new CheckoutError("Esta oferta não está mais disponível.", 409);
+  const settings = await getSettingsFresh();
+  if (!isOn(settings.pix_enabled) || bravopayMode() === "disabled") throw new CheckoutError("O PIX está indisponível no momento. Tente novamente em alguns minutos.", 503);
+  const u = await db.upsell.findUniqueOrThrow({ where: { id: upsellId }, include: { product: true } });
+  if (u.product.stockQuantity != null && u.product.stockQuantity < u.quantity) throw new CheckoutError("Produto indisponível no estoque.", 409);
+  const totals = computeTotals([{ unitPriceCents: u.priceCents, quantity: 1 }], 0);
+  if (totals.totalCents < MIN_PIX_CENTS) throw new CheckoutError("O valor mínimo para pagamento via PIX é R$ 5,00.");
+
+  const order = await db.$transaction(async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        customerId: parent.customerId,
+        customerSnapshot: parent.customerSnapshot as Prisma.InputJsonValue,
+        shippingAddress: (parent.shippingAddress ?? undefined) as Prisma.InputJsonValue | undefined,
+        paymentMethod: "PIX",
+        status: "PENDING",
+        paymentProvider: "bravopay",
+        ...totals,
+        checkoutToken: `upsell_${parent.id}_${u.id}`, // idempotente: duplo clique devolve o mesmo pedido
+        accessToken: randomToken(24),
+        parentOrderId: parent.id,
+        source: "UPSELL",
+        upsellId: u.id,
+        adsConsent: parent.adsConsent,
+        utmSource: parent.utmSource,
+        utmMedium: parent.utmMedium,
+        utmCampaign: parent.utmCampaign,
+        utmContent: parent.utmContent,
+        utmTerm: parent.utmTerm,
+        firstTouchSource: parent.firstTouchSource,
+        firstTouchMedium: parent.firstTouchMedium,
+        firstTouchCampaign: parent.firstTouchCampaign,
+        fbclid: parent.fbclid,
+        gclid: parent.gclid,
+        fbp: parent.fbp,
+        fbc: parent.fbc,
+        sessionId: parent.sessionId,
+        visitorId: parent.visitorId,
+        device: parent.device,
+        userAgent: parent.userAgent,
+        ipHash: parent.ipHash,
+        channel: parent.channel,
+        landingPage: parent.landingPage,
+        items: {
+          create: [
+            {
+              kind: "UPSELL" as const,
+              productId: u.productId,
+              productName: u.product.name,
+              offerName: u.title,
+              sku: u.product.sku,
+              unitsPerOffer: u.quantity,
+              quantity: 1,
+              unitPriceCents: u.priceCents,
+              listPriceCents: u.compareAtPriceCents ?? u.priceCents,
+              totalPriceCents: u.priceCents,
+            },
+          ],
+        },
+      },
+    });
+    const orderNumber = await uniqueOrderNumber(tx, created.seq);
+    return tx.order.update({ where: { id: created.id }, data: { orderNumber, externalReference: orderNumber, metaEventId: `purchase_${created.id}` } });
+  }).catch(async (err) => {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const again = await db.order.findUnique({ where: { checkoutToken: `upsell_${parent.id}_${u.id}` } });
+      if (again) return again;
+    }
+    throw err;
+  });
+
+  await recordUpsellEvent(u.id, parent.id, "ACCEPT");
+  await logOrderEvent(order.id, "order_created", `Pedido ${order.orderNumber} criado (upsell do pedido ${parent.orderNumber})`, { total: order.totalCents, upsell: u.title });
+  await logOrderEvent(parent.id, "upsell_accepted", `Upsell aceito — novo pedido ${order.orderNumber}`, { upsell: u.title });
+  await trackServerEvent(order, "order_created", { valueCents: order.totalCents, productId: u.productId, props: { method: "PIX", source: "upsell" } });
+  return order.pixCopyPaste ? order : ensurePix(order.id);
+}
+
+/** Dados extras da página do pedido: upsell elegível, linha do tempo de entrega e textos de frete. */
+export async function withOrderExtras(o: AccessOrder, pub: PublicOrder): Promise<PublicOrder> {
+  const settings = await getSettingsFresh();
+  const [upsell, tl] = await Promise.all([
+    upsellForOrder(o).catch(() => null),
+    publicTimeline(o, settings).catch(() => ({ events: [], delivered: false })),
+  ]);
+  return { ...pub, upsell, timeline: tl.events, etaText: settings.shipping_eta_text, shippingLabel: isOn(settings.shipping_free_enabled) ? settings.shipping_label : "" };
 }

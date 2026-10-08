@@ -11,11 +11,11 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   logo_mark_url: "/brand/logo-circular.webp",
   favicon_url: "/brand/favicon.png",
   // Empresa e contato — preencher com dados reais (vazio = não exibido)
-  company_name: "",
-  company_document: "",
-  contact_email: "",
+  company_name: "Clear Industria e Comercio de Produtos LTDA",
+  company_document: "57.732.599/0001-75",
+  contact_email: "contato@clearfinger.shop",
   contact_phone: "",
-  whatsapp: "",
+  whatsapp: "1142305480",
   address: "",
   support_hours: "",
   instagram_url: "",
@@ -33,9 +33,32 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   sticky_cta_label: "QUERO O MEU CLEARFINGER",
   footer_text: "",
   // Envio
+  bump_section_title: "Adicione também ao seu pedido",
+  bump_section_text: "Ofertas exclusivas deste pedido. Marque se quiser adicionar.",
+  shipping_free_enabled: "true",
   shipping_flat_cents: "0",
-  shipping_label: "Envio para todo o Brasil",
+  shipping_label: "Frete grátis para todo o Brasil",
+  shipping_eta: "3 a 5 dias úteis",
+  shipping_eta_text: "Entrega estimada em 3 a 5 dias úteis",
+  shipping_checkout_text: "Frete grátis para todo o Brasil · entrega em 3 a 5 dias úteis",
   shipping_note: "",
+  // Rastreamento de pedido (timeline automática após o pagamento)
+  tracking_auto_enabled: "true",
+  tracking_holidays: "",
+  tracking_paid_title: "Pagamento concluído",
+  tracking_paid_description: "Recebemos a confirmação do seu pagamento.",
+  tracking_separating_title: "Separando pedido",
+  tracking_separating_description: "Seu pedido foi confirmado e está sendo preparado para envio.",
+  tracking_dc_arrived_title: "Pedido chegou ao centro de distribuição",
+  tracking_dc_arrived_description: "Seu pedido chegou ao centro de distribuição e está sendo processado.",
+  tracking_dispatched_title: "Pedido despachado para a cidade de destino",
+  tracking_dispatched_description: "Seu pedido foi encaminhado para a unidade responsável pela entrega na sua região.",
+  tracking_dest_dc_arrived_title: "Pedido chegou ao centro de distribuição da cidade destino",
+  tracking_dest_dc_arrived_description: "Seu pedido chegou à unidade responsável pela entrega final.",
+  tracking_out_for_delivery_title: "Pedido saiu para entrega",
+  tracking_out_for_delivery_description: "Seu pedido está a caminho. Aguarde a entrega no endereço informado.",
+  tracking_delivered_title: "Pedido entregue",
+  tracking_delivered_description: "Seu pedido foi entregue. Aproveite!",
   // Checkout
   checkout_title: "Finalizar pedido",
   checkout_security_text: "Seus dados são protegidos e usados apenas para processar e entregar o seu pedido.",
@@ -96,10 +119,8 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   og_image_url: "/brand/kit.webp",
   canonical_url: "",
   robots_index: "true",
-  // Políticas (modelos iniciais — revisar com o jurídico; [PREENCHER] = dado real da empresa)
-  policy_privacy: `[PREENCHER] Política de Privacidade
-
-Este texto é um modelo inicial e precisa ser revisado com os dados reais da empresa.
+  // Políticas (revise com o seu jurídico)
+  policy_privacy: `Política de Privacidade
 
 1. Quais dados coletamos
 Nome, WhatsApp, e-mail, CPF e endereço de entrega, informados por você no checkout. No pagamento pelo crediário, também registramos o número do protocolo, a validade e os 3 últimos dígitos do CPF, usados exclusivamente para a análise do pedido. Registramos ainda dados de navegação anônimos (páginas vistas, origem da visita e dispositivo).
@@ -111,20 +132,20 @@ Processar e entregar o pedido, gerar o pagamento PIX junto ao processador de pag
 Com o processador de pagamentos (PIX), com a transportadora e, se você não recusar os cookies de marketing, com plataformas de anúncios (Meta, Google). Dados do crediário nunca são enviados a plataformas de anúncios.
 
 4. Seus direitos (LGPD)
-Você pode solicitar acesso, correção ou exclusão dos seus dados pelo e-mail de contato.
+Você pode solicitar acesso, correção ou exclusão dos seus dados pelo e-mail contato@clearfinger.shop.
 
 5. Controlador
-[PREENCHER razão social, CNPJ e e-mail].`,
-  policy_terms: `[PREENCHER] Termos de Uso
+Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.`,
+  policy_terms: `Termos de Uso
 
-Este texto é um modelo inicial e precisa ser revisado com os dados reais da empresa.
+Este site é operado por Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.
 
 Ao comprar neste site você concorda com as condições de venda, prazos e políticas publicadas. Preços e ofertas podem ser alterados sem aviso, sem afetar pedidos já realizados. Pedidos no crediário são confirmados somente após a análise do protocolo informado.`,
-  policy_returns: `[PREENCHER] Política de Troca e Devolução
+  policy_returns: `Política de Troca e Devolução
 
-Este texto é um modelo inicial e precisa ser revisado com os dados reais da empresa.
+Compras online podem ser canceladas em até 7 dias corridos após o recebimento (art. 49 do Código de Defesa do Consumidor). Produtos com defeito podem ser trocados conforme a legislação. Para solicitar, entre em contato pelo e-mail contato@clearfinger.shop ou pelo WhatsApp (11) 4230-5480 informando o número do pedido — vamos orientar você sobre como fazer a devolução.
 
-Compras online podem ser canceladas em até 7 dias corridos após o recebimento (art. 49 do Código de Defesa do Consumidor). Produtos com defeito podem ser trocados conforme a legislação. Para solicitar, entre em contato pelos canais de atendimento informando o número do pedido.`,
+Responsável: Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.`,
   policy_cookies: `Política de Cookies
 
 Usamos cookies essenciais para o funcionamento do site (sessão e segurança) e cookies de medição e marketing (Meta Pixel e Google) para medir e melhorar nossos anúncios. Os cookies de medição e marketing ficam ativos por padrão e você pode recusá-los a qualquer momento pelo aviso de cookies ou pelo link "Preferências de cookies" no rodapé. Depois de recusar, nenhum dado da sua navegação ou compra é enviado ao Meta ou ao Google.`,

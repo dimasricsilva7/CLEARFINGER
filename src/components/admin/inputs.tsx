@@ -4,7 +4,8 @@ import { useState } from "react";
 import { inputCls, textareaCls, btnSecondary } from "./ui";
 import { ICONS } from "@/lib/domain";
 
-export { ImageField } from "./media";
+import { ImageField } from "./media";
+export { ImageField };
 
 /** Campo de vídeo: link MP4 (https), YouTube ou Vimeo, com prévia. */
 export function VideoInput({ name, label, defaultValue }: { name: string; label: string; defaultValue?: string | null }) {
@@ -123,3 +124,41 @@ export function StepsEditor({ name, defaultValue }: { name: string; defaultValue
 }
 
 
+
+/** Passos do "Como usar": título, descrição e imagem (enviar arquivo ou URL) por passo, reordenáveis. */
+export function StepsWithImagesEditor({ name, defaultValue }: { name: string; defaultValue: Record<string, unknown>[] }) {
+  type Step = { key: number; title: string; text: string; imageUrl: string };
+  const [items, setItems] = useState<Step[]>(() => defaultValue.map((d, i) => ({ key: i, title: String(d.title ?? ""), text: String(d.text ?? ""), imageUrl: String(d.imageUrl ?? "") })));
+  const update = (k: number, patch: Partial<Step>) => setItems((l) => l.map((s) => (s.key === k ? { ...s, ...patch } : s)));
+  const move = (idx: number, d: -1 | 1) =>
+    setItems((l) => {
+      const n = [...l];
+      const j = idx + d;
+      if (j < 0 || j >= n.length) return l;
+      [n[idx], n[j]] = [n[j], n[idx]];
+      return n;
+    });
+  return (
+    <div className="space-y-3">
+      <input type="hidden" name={name} value={JSON.stringify(items.map(({ title, text, imageUrl }) => ({ title, text, imageUrl })))} />
+      {items.map((s, idx) => (
+        <div key={s.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase text-slate-500">Passo {String(idx + 1).padStart(2, "0")}</p>
+            <div className="flex gap-1">
+              <button type="button" onClick={() => move(idx, -1)} className="h-8 w-8 rounded border border-slate-300 bg-white text-sm" aria-label="Subir">↑</button>
+              <button type="button" onClick={() => move(idx, 1)} className="h-8 w-8 rounded border border-slate-300 bg-white text-sm" aria-label="Descer">↓</button>
+              <button type="button" onClick={() => setItems((l) => l.filter((x) => x.key !== s.key))} className="h-8 rounded border border-red-200 bg-white px-2 text-xs font-semibold text-red-600">Excluir</button>
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <input value={s.title} onChange={(e) => update(s.key, { title: e.target.value })} placeholder="Título (ex.: Aplique)" className={inputCls} aria-label="Título" />
+            <textarea value={s.text} onChange={(e) => update(s.key, { text: e.target.value })} rows={2} placeholder="Descrição curta" className={textareaCls} aria-label="Descrição" />
+            <div className="md:col-span-2"><ImageField name="" label="Imagem do passo" defaultValue={s.imageUrl} category="DEMONSTRACAO" onChange={(url) => update(s.key, { imageUrl: url })} /></div>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={() => setItems((l) => [...l, { key: Date.now(), title: "", text: "", imageUrl: "" }])} className={btnSecondary}>+ Adicionar passo</button>
+    </div>
+  );
+}

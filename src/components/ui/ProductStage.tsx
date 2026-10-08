@@ -1,17 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 /**
- * Produto num "palco" claro (o recorte sem fundo se integra à paleta). Para kits, mostra
- * a quantidade real de unidades lado a lado, com leve sobreposição — o cliente vê o que está levando.
+ * Foto oficial do produto (opaca, fundo branco). Em kits, a MESMA foto é repetida lado a lado,
+ * na mesma escala e alinhada pela base: 1 unidade = 1 produto, 2 = 2 produtos, 3 = 3 produtos.
  */
 export function ProductStack({ src, alt, count = 1, className = "", priority = false }: { src: string; alt: string; count?: number; className?: string; priority?: boolean }) {
   const n = Math.max(1, Math.min(3, count));
-  // largura de cada unidade (em % da caixa) e passo entre elas — cabem lado a lado com ~25% de sobreposição
-  const unit = n === 1 ? 100 : n === 2 ? 62 : 46;
-  const step = n === 1 ? 0 : (100 - unit) / (n - 1);
   const positioned = /(^|\s)(absolute|fixed)(\s|$)/.test(className);
   return (
-    <div className={`${positioned ? "" : "relative"} ${className}`} role="img" aria-label={n > 1 ? `${alt} — ${count} unidades` : alt}>
+    <div className={`${positioned ? "" : "relative"} flex items-end justify-center gap-[2%] ${className}`} role="img" aria-label={n > 1 ? `${alt} — ${count} unidades` : alt}>
       {Array.from({ length: n }, (_, i) => (
         <img
           key={i}
@@ -19,28 +16,19 @@ export function ProductStack({ src, alt, count = 1, className = "", priority = f
           alt=""
           aria-hidden="true"
           loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority && i === n - 1 ? "high" : undefined}
+          fetchPriority={priority && i === 0 ? "high" : undefined}
           decoding="async"
-          width={915}
-          height={1139}
-          className="absolute bottom-0 h-full object-contain object-bottom drop-shadow-[0_16px_20px_rgba(11,37,69,0.16)]"
-          style={{ left: `${i * step}%`, width: `${unit}%`, zIndex: i, filter: i < n - 1 ? "brightness(0.97)" : undefined }}
+          width={992}
+          height={1100}
+          className="h-full min-w-0 object-contain object-bottom"
+          style={{ width: `${100 / n - (n > 1 ? 1.5 : 0)}%` }}
         />
       ))}
     </div>
   );
 }
 
-/** Palco: círculo de luz suave em tons da marca, atrás do produto. */
+/** Painel branco limpo atrás do produto (a foto tem fundo branco e se funde a ele). */
 export function Stage({ children, className = "", tone = "light" }: { children: React.ReactNode; className?: string; tone?: "light" | "onDark" }) {
-  return (
-    <div className={`relative isolate ${className}`}>
-      <div
-        aria-hidden="true"
-        className={`absolute inset-x-[4%] bottom-[2%] top-[6%] -z-10 rounded-full ${tone === "onDark" ? "bg-[radial-gradient(closest-side,#ffffff_0%,#eaf2fb_58%,rgba(234,242,251,0)_100%)]" : "bg-[radial-gradient(closest-side,#ffffff_0%,#e3ecf7_62%,rgba(227,236,247,0)_100%)]"}`}
-      />
-      <div aria-hidden="true" className="absolute bottom-[4%] left-1/2 -z-10 h-[5%] w-[56%] -translate-x-1/2 rounded-[100%] bg-navy/15 blur-xl" />
-      {children}
-    </div>
-  );
+  return <div className={`relative overflow-hidden rounded-[1.75rem] bg-white ${tone === "onDark" ? "shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]" : "shadow-soft ring-1 ring-line/70"} ${className}`}>{children}</div>;
 }

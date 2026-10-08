@@ -9,7 +9,7 @@ import { saveSettings } from "../sistema-actions";
 export const metadata = { title: "Configurações" };
 type SP = Promise<{ aba?: string }>;
 
-const TABS = { marca: "Marca", empresa: "Empresa e contato", aparencia: "Aparência e layout", checkout: "Checkout e envio", rastreamento: "Tracking (Meta / Google)", seo: "SEO", politicas: "Políticas", sistema: "Sistema" } as const;
+const TABS = { marca: "Marca", empresa: "Empresa e contato", aparencia: "Aparência e layout", checkout: "Checkout", entrega: "Entrega", rastreamento: "Tracking (Meta / Google)", seo: "SEO", politicas: "Políticas", sistema: "Sistema" } as const;
 
 export default async function SettingsPage({ searchParams }: { searchParams: SP }) {
   const tab = ((await searchParams).aba ?? "marca") as keyof typeof TABS;
@@ -105,20 +105,60 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
       )}
 
       {tab === "checkout" && (
-        <Card title="Checkout e envio">
+        <Card title="Checkout">
           {form(
-            ["checkout_title", "checkout_security_text", "require_cpf", "marketing_consent_label", "shipping_flat_cents", "shipping_label", "shipping_note"],
+            ["checkout_title", "checkout_security_text", "require_cpf", "marketing_consent_label", "bump_section_title", "bump_section_text"],
             <div className="grid gap-4 md:grid-cols-2">
               {text("checkout_title", "Título do checkout")}
               <div className="flex items-end">{check("require_cpf", "Exigir CPF (recomendado para o PIX)")}</div>
               <Field label="Texto de segurança" className="md:col-span-2"><textarea name="checkout_security_text" rows={2} defaultValue={s.checkout_security_text} className={textareaCls} /></Field>
               <Field label="Texto do opt-in de marketing" className="md:col-span-2"><input name="marketing_consent_label" defaultValue={s.marketing_consent_label} className={inputCls} /></Field>
-              <Field label="Frete fixo (R$)" hint="0 = frete grátis"><input name="shipping_flat_cents" defaultValue={(Number(s.shipping_flat_cents) / 100).toFixed(2).replace(".", ",")} className={inputCls} /></Field>
-              {text("shipping_label", "Selo de envio (checkout)", "Ex.: Envio para todo o Brasil — só se for verdade")}
-              {text("shipping_note", "Observação de entrega", "Ex.: prazo estimado — informe só prazos reais")}
+              {text("bump_section_title", "Título dos order bumps", "Ex.: Adicione também ao seu pedido")}
+              {text("bump_section_text", "Texto dos order bumps")}
+              <p className="text-sm text-slate-500 md:col-span-2">Frete e prazo de entrega ficam na aba <Link href="?aba=entrega" className="font-semibold underline">Entrega</Link>.</p>
             </div>
           )}
         </Card>
+      )}
+
+      {tab === "entrega" && (
+        <div className="space-y-6">
+          <Card title="Frete e prazo">
+            {form(
+              ["shipping_free_enabled", "shipping_flat_cents", "shipping_label", "shipping_eta", "shipping_eta_text", "shipping_checkout_text", "shipping_note"],
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">{check("shipping_free_enabled", "Frete grátis ativado (o valor fixo abaixo é ignorado)")}</div>
+                <Field label="Frete fixo (R$)" hint="Usado só com o frete grátis desativado"><input name="shipping_flat_cents" defaultValue={(Number(s.shipping_flat_cents) / 100).toFixed(2).replace(".", ",")} className={inputCls} /></Field>
+                {text("shipping_label", "Texto do frete (landing e checkout)", "Ex.: Frete grátis para todo o Brasil")}
+                {text("shipping_eta", "Prazo curto", "Ex.: 3 a 5 dias úteis")}
+                {text("shipping_eta_text", "Texto do prazo (rastreio e pedido)", "Ex.: Entrega estimada em 3 a 5 dias úteis")}
+                {text("shipping_checkout_text", "Texto no resumo do checkout")}
+                {text("shipping_note", "Observação extra de entrega (opcional)")}
+              </div>
+            )}
+          </Card>
+          <Card title="Rastreio automático">
+            {form(
+              ["tracking_auto_enabled", "tracking_holidays", ...["paid", "separating", "dc_arrived", "dispatched", "dest_dc_arrived", "out_for_delivery", "delivered"].flatMap((k) => [`tracking_${k}_title`, `tracking_${k}_description`])],
+              <>
+                {check("tracking_auto_enabled", "Gerar as etapas da entrega automaticamente após o pagamento (dias úteis, horário de Brasília)")}
+                <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                  Etapa 1 no pagamento · Etapa 2 no próximo dia útil às 10:30 · Etapa 3 no mesmo dia às 16:30 · Etapa 4 no dia útil seguinte às 09:30 · Etapa 5 no mesmo dia às 16:30 · Etapa 6 no dia útil seguinte às 10:30 · &quot;Entregue&quot; só manualmente, na página do pedido.
+                </p>
+                <Field label="Feriados (sem movimentação)" hint="Datas AAAA-MM-DD separadas por vírgula. Ex.: 2026-11-20, 2026-12-25"><input name="tracking_holidays" defaultValue={s.tracking_holidays} className={inputCls} /></Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {[["paid", "1. Pagamento"], ["separating", "2. Separação"], ["dc_arrived", "3. Centro de distribuição"], ["dispatched", "4. Despachado"], ["dest_dc_arrived", "5. CD da cidade destino"], ["out_for_delivery", "6. Saiu para entrega"], ["delivered", "Entregue (manual)"]].map(([k, l]) => (
+                    <div key={k} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                      <p className="text-xs font-bold uppercase text-slate-500">{l}</p>
+                      <input name={`tracking_${k}_title`} defaultValue={s[`tracking_${k}_title`]} className={inputCls} aria-label={`Título — ${l}`} />
+                      <textarea name={`tracking_${k}_description`} defaultValue={s[`tracking_${k}_description`]} rows={2} className={textareaCls} aria-label={`Descrição — ${l}`} />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
       )}
 
       {tab === "rastreamento" && (

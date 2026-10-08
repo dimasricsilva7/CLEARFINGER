@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ProductStack } from "@/components/ui/ProductStage";
 import { gaEvent, metaEvent, track } from "@/lib/client/tracking";
+import { TrackingTimeline } from "@/components/ui/TrackingTimeline";
+import { UpsellCard } from "./UpsellCard";
 import { FULFILLMENT_LABEL, ORDER_STATUS_LABEL, isAwaitingPix, isPaidStatus } from "@/lib/domain";
 import { formatBRL } from "@/utils/format";
 import type { PublicOrder } from "@/types/order";
@@ -27,7 +29,7 @@ function Summary({ order, imageUrl }: { order: PublicOrder; imageUrl: string | n
   const main = order.items.find((i) => i.kind === "OFFER") ?? order.items[0];
   return (
     <section className="card overflow-hidden">
-      <div className="flex items-center gap-4 border-b border-line bg-gradient-to-b from-mist to-surface p-4">
+      <div className="flex items-center gap-4 border-b border-line bg-white p-4">
         {imageUrl && main && <ProductStack src={imageUrl} alt="" count={main.units * main.quantity} className="h-20 w-24 shrink-0" />}
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">Resumo do pedido</p>
@@ -45,6 +47,12 @@ function Summary({ order, imageUrl }: { order: PublicOrder; imageUrl: string | n
         <div className="flex justify-between"><span className="text-muted">Frete</span><span className={order.shippingCents ? "" : "font-semibold text-success"}>{order.shippingCents ? formatBRL(order.shippingCents) : "Grátis"}</span></div>
         <div className="flex items-baseline justify-between border-t border-line pt-2.5"><span className="font-semibold text-navy">Total</span><span className="font-display text-xl font-semibold tabular-nums text-navy">{formatBRL(order.totalCents)}</span></div>
         {order.crediario && <div className="flex justify-between text-navy"><span>{order.crediario.methodLabel}</span><span className="font-semibold">{order.crediario.installmentLabel}</span></div>}
+        {(order.shippingLabel || order.etaText) && (
+          <p className="flex items-center gap-2 rounded-xl bg-success/[0.08] px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-navy ring-1 ring-success/20">
+            <Icon name="truck" className="h-4 w-4 shrink-0 text-success" />
+            <span>{order.shippingLabel}{order.shippingLabel && order.etaText ? " · " : ""}<span className="font-semibold text-muted">{order.etaText}</span></span>
+          </p>
+        )}
       </div>
     </section>
   );
@@ -332,8 +340,22 @@ export function OrderClient({ initial, token, qrSvg, whatsappUrl, storeName, cre
         </p>
       )}
 
+      {order.upsell && order.upsell.position === "TOP" && <UpsellCard upsell={order.upsell} orderNumber={order.orderNumber} token={token} />}
+
+      {paid && order.timeline && order.timeline.length > 0 && (
+        <section className="card p-5" aria-labelledby="h-entrega">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="h-entrega" className="font-semibold text-navy">Acompanhe sua entrega</h2>
+            {order.etaText && <p className="text-xs font-semibold text-success">{order.etaText}</p>}
+          </div>
+          <TrackingTimeline events={order.timeline} />
+          <Link href={`/rastrear-pedido?pedido=${encodeURIComponent(order.orderNumber)}`} className="btn-ghost mt-3 w-full">Abrir página de rastreio</Link>
+        </section>
+      )}
+
       <Summary order={order} imageUrl={imageUrl} />
-      {(awaiting || paid) && <NextSteps paid={paid} />}
+      {order.upsell && order.upsell.position === "BOTTOM" && <UpsellCard upsell={order.upsell} orderNumber={order.orderNumber} token={token} />}
+      {(awaiting || (paid && !order.timeline?.length)) && <NextSteps paid={paid} />}
 
       <div className="flex flex-col items-center gap-2 pt-2 text-sm">
         {whatsappUrl && (

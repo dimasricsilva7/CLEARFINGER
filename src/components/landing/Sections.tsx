@@ -18,7 +18,24 @@ export type LandingCtx = {
   /** "ou 2x de R$ 29,95 no crediário" para um valor (null se o crediário estiver desligado) */
   crediarioHint: (cents: number) => string | null;
   pixLabel: string | null;
+  /** Frete grátis + prazo (null com frete grátis desligado) */
+  shipping: { label: string; eta: string } | null;
 };
+
+/** Faixa "FRETE GRÁTIS PARA TODO O BRASIL · ENTREGA DE 3 A 5 DIAS ÚTEIS". */
+function ShippingStrip({ ctx, tone, className = "" }: { ctx: LandingCtx; tone: Tone; className?: string }) {
+  if (!ctx.shipping) return null;
+  const d = dark(tone);
+  return (
+    <p data-testid="shipping-strip" className={`inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-[11.5px] font-bold uppercase leading-tight tracking-[0.06em] sm:text-xs ${d ? "bg-white/10 text-white ring-1 ring-white/15" : "bg-success/[0.08] text-navy ring-1 ring-success/25"} ${className}`}>
+      <Icon name="truck" className={`h-4 w-4 shrink-0 ${d ? "text-white" : "text-success"}`} />
+      <span>
+        {ctx.shipping.label}
+        {ctx.shipping.eta && <span className={`block font-semibold sm:inline ${d ? "text-white/70" : "text-muted"}`}><span className="hidden sm:inline"> · </span>Entrega de {ctx.shipping.eta}</span>}
+      </span>
+    </p>
+  );
+}
 
 type P = { s: SectionData; ctx: LandingCtx; tone: Tone };
 
@@ -46,7 +63,7 @@ const productAlt = (ctx: LandingCtx) => ctx.product?.mainImage?.alt ?? ctx.produ
 
 // ───────────── Primeira tela ─────────────
 
-function Hero({ s, ctx }: P) {
+function Hero({ s, ctx, tone }: P) {
   const p = ctx.product;
   const offers = p?.offers ?? [];
   const entry = offers.length ? offers.reduce((a, b) => (b.priceCents < a.priceCents ? b : a)) : null;
@@ -84,6 +101,7 @@ function Hero({ s, ctx }: P) {
             {s.ctaLabel || "Comprar"}
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </a>
+          <div className="mt-3 flex justify-center md:justify-start"><ShippingStrip ctx={ctx} tone={tone} /></div>
           {badges.length > 0 && (
             <ul className="mt-5 grid grid-cols-3 gap-2 md:flex md:flex-wrap md:gap-x-6">
               {badges.map((b, i) => (
@@ -196,25 +214,44 @@ function Solution({ s, ctx, tone }: P) {
 // ───────────── Como funciona ─────────────
 
 function HowItWorks({ s, tone }: P) {
-  const steps = cfgArr<{ title: string; text?: string }>(s.config, "steps").filter((x) => x?.title);
+  const steps = cfgArr<{ title: string; text?: string; imageUrl?: string }>(s.config, "steps").filter((x) => x?.title);
   const note = cfgStr(s.config, "note");
   const d = dark(tone);
+  const video = s.videoUrl || null;
+  const withImages = steps.some((st) => st.imageUrl);
   return (
     <section id="como-funciona" className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} tone={tone} eyebrow="Passo a passo" />
-        <ol className="mt-10 grid gap-4 md:grid-cols-3 md:gap-6">
-          {steps.map((st, i) => (
-            <li key={i} className={`relative overflow-hidden rounded-card p-6 sm:p-7 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : "bg-surface shadow-soft ring-1 ring-line"}`}>
-              <span aria-hidden="true" className={`absolute -right-1 -top-5 font-display text-[6.5rem] font-bold leading-none ${d ? "text-white/[0.06]" : "text-primary/[0.07]"}`}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-primary font-display text-sm font-semibold text-white">{String(i + 1).padStart(2, "0")}</span>
-              <p className={`mt-5 font-display text-xl font-semibold uppercase tracking-[0.08em] ${d ? "text-white" : "text-navy"}`}>{st.title}</p>
-              {st.text && <p className={`mt-2 leading-relaxed ${d ? "text-white/70" : "text-muted"}`}>{st.text}</p>}
-            </li>
-          ))}
-        </ol>
+        <Heading s={s} tone={tone} eyebrow="Como usar" />
+        <div className={`mt-10 grid items-start gap-6 ${video ? "lg:grid-cols-[300px_1fr] lg:gap-8" : ""}`}>
+          {video && (
+            <div className="mx-auto w-full max-w-[300px]">
+              <DemoVideo url={video} poster={cfgStr(s.config, "posterUrl")} label={s.title ?? "Veja como funciona"} />
+            </div>
+          )}
+          <ol className={`grid gap-4 md:gap-6 ${video ? "sm:grid-cols-3 lg:grid-cols-3" : "md:grid-cols-3"}`}>
+            {steps.map((st, i) => (
+              <li key={i} className={`relative overflow-hidden rounded-card ${withImages ? "grid grid-cols-[38%_1fr] sm:block" : ""} ${d ? "bg-white/[0.06] ring-1 ring-white/10" : "bg-surface shadow-soft ring-1 ring-line"}`}>
+                {withImages && (
+                  <div className="relative min-h-[150px] bg-mist sm:aspect-[9/10] sm:min-h-0">
+                    {st.imageUrl && <img src={st.imageUrl} alt={st.title} loading="lazy" decoding="async" width={900} height={1000} className="absolute inset-0 h-full w-full object-cover sm:static" />}
+                    <span className="absolute left-2 top-2 sm:left-3 sm:top-3 rounded-full bg-white/95 px-2.5 py-1 font-display text-[10px] font-bold uppercase sm:px-3 sm:text-xs tracking-[0.12em] text-navy shadow-sm">Passo {i + 1}</span>
+                  </div>
+                )}
+                <div className="relative self-center p-4 sm:p-6">
+                  {!withImages && (
+                    <>
+                      <span aria-hidden="true" className={`absolute -right-1 -top-5 font-display text-[6.5rem] font-bold leading-none ${d ? "text-white/[0.06]" : "text-primary/[0.07]"}`}>{String(i + 1).padStart(2, "0")}</span>
+                      <span className="mb-5 grid h-10 w-10 place-items-center rounded-full bg-primary font-display text-sm font-semibold text-white">{String(i + 1).padStart(2, "0")}</span>
+                    </>
+                  )}
+                  <p className={`font-display text-base font-semibold uppercase tracking-[0.08em] sm:text-lg ${d ? "text-white" : "text-navy"}`}>{st.title}</p>
+                  {st.text && <p className={`mt-1.5 text-sm leading-relaxed sm:mt-2 sm:text-[15px] ${d ? "text-white/70" : "text-muted"}`}>{st.text}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
         {note && <p className={`mt-5 text-sm ${d ? "text-white/60" : "text-muted"}`}>{note}</p>}
       </div>
     </section>
@@ -332,6 +369,7 @@ function Offers({ s, ctx, tone }: P) {
       {d && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_0%,rgb(var(--c-primary)/0.35),transparent_70%)]" />}
       <div className="container-page relative">
         <Heading s={s} tone={tone} center eyebrow="Kits e preços" />
+        <div className="mt-5 flex justify-center"><ShippingStrip ctx={ctx} tone={tone} /></div>
         <ul className={`mx-auto mt-10 grid max-w-5xl gap-5 ${p.offers.length >= 3 ? "md:grid-cols-3" : p.offers.length === 2 ? "md:grid-cols-2" : "max-w-md"} md:items-center`}>
           {p.offers.map((o) => {
             const disc = offerDiscountLabel(o);
@@ -342,7 +380,7 @@ function Offers({ s, ctx, tone }: P) {
               <li key={o.id} className={`relative flex flex-col overflow-hidden rounded-[1.5rem] bg-surface text-ink ${o.highlight ? "order-first shadow-[0_30px_60px_-25px_rgba(0,0,0,0.55)] ring-2 ring-primary md:order-none md:scale-[1.04]" : "shadow-lift ring-1 ring-line"}`}>
                 <ViewTracker id={`offer-${o.id}`} event="offer_view" productId={p.id} offerId={o.id} valueCents={o.priceCents} />
                 {o.badge && <span className={`absolute inset-x-0 top-0 z-10 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white ${o.highlight ? "bg-primary" : "bg-navy"}`}>{o.badge}</span>}
-                <div className={`relative bg-gradient-to-b from-mist to-surface px-6 ${o.badge ? "pt-10" : "pt-6"}`}>
+                <div className={`relative bg-white px-6 ${o.badge ? "pt-10" : "pt-6"}`}>
                   {img && <ProductStack src={img} alt={`${p.name} — ${o.name}`} count={o.quantity} className="mx-auto aspect-[1/0.82] w-full max-w-[17rem]" />}
                   {o.quantity > 1 && <span className="absolute bottom-1 left-5 z-10 grid h-11 w-11 place-items-center rounded-full bg-navy font-display text-base font-semibold text-white shadow-lift ring-4 ring-surface">×{o.quantity}</span>}
                 </div>
@@ -446,6 +484,7 @@ function FinalCta({ s, ctx, tone }: P) {
           <a href={s.ctaTarget || "#ofertas"} data-cta="final_cta" className="btn-primary mt-8 w-full sm:w-auto sm:px-10">
             {s.ctaLabel || "Comprar"}
           </a>
+          <div className="mt-4 flex justify-center md:justify-start"><ShippingStrip ctx={ctx} tone={tone} /></div>
         </div>
       </div>
     </section>

@@ -21,6 +21,7 @@ const VALIDATORS: Record<string, (v: string) => string | null> = {
   gtm_id: (v) => (!v || /^GTM-[A-Z0-9]{4,12}$/.test(v) ? null : "ID do GTM no formato GTM-XXXXXXX"),
   google_ads_id: (v) => (!v || /^AW-\d{6,14}$/.test(v) ? null : "ID do Google Ads no formato AW-123456789"),
   google_ads_purchase_label: (v) => (!v || /^[A-Za-z0-9_-]{4,40}$/.test(v) ? null : "Rótulo de conversão inválido"),
+  tracking_holidays: (v) => (!v || v.split(/[\s,;]+/).filter(Boolean).every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) ? null : "Feriados: use datas no formato AAAA-MM-DD separadas por vírgula"),
   shipping_flat_cents: (v) => (/^\d{1,7}$/.test(v) ? null : "Frete inválido"),
   pix_expiration_minutes: intRange(5, 1440, "Validade do PIX entre 5 e 1440 minutos"),
   crediario_protocol_digits: intRange(4, 32, "Dígitos do protocolo entre 4 e 32"),
@@ -32,7 +33,7 @@ const VALIDATORS: Record<string, (v: string) => string | null> = {
   pix_method_label: (v) => (v ? null : "Informe o nome do método PIX"),
 };
 const URL_KEYS = ["logo_url", "logo_mark_url", "favicon_url", "og_image_url", "canonical_url", "instagram_url", "tiktok_url", "facebook_url", "youtube_url"];
-const BOOL_KEYS = ["sticky_cta_enabled", "require_cpf", "meta_pixel_enabled", "meta_capi_enabled", "ga_enabled", "cookie_banner_enabled", "pix_enabled", "crediario_enabled", "crediario_validity_reject_expired", "robots_index"];
+const BOOL_KEYS = ["sticky_cta_enabled", "require_cpf", "meta_pixel_enabled", "meta_capi_enabled", "ga_enabled", "cookie_banner_enabled", "pix_enabled", "crediario_enabled", "crediario_validity_reject_expired", "robots_index", "shipping_free_enabled", "tracking_auto_enabled"];
 
 /** Salva somente as chaves presentes no formulário (cada aba/página envia as suas). */
 export async function saveSettings(_: ActionResult, fd: FormData): Promise<ActionResult> {

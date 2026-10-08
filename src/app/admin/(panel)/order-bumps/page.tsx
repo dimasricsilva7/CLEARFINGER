@@ -43,8 +43,8 @@ export default async function BumpsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Order bumps"
-        description="Ofertas que o cliente marca no checkout para adicionar ao pedido (desmarcadas por padrão). Produto, textos, preço e imagem editáveis."
+        title="Order bump"
+        description="&quot;Adicione também ao seu pedido&quot;: ofertas que o cliente marca no checkout para adicionar ao pedido (desmarcadas por padrão). Produto, textos, preço e imagem editáveis."
         actions={<Link href="/admin/produtos/novo" className={btnSecondary}>Novo produto</Link>}
       />
       {bumps.map((b) => {

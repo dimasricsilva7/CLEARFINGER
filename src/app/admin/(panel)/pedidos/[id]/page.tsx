@@ -9,7 +9,10 @@ import { decryptField } from "@/lib/crypto";
 import { maskCpfLast } from "@/lib/crediario";
 import { db } from "@/lib/db";
 import { formatBRL, formatCep, formatCpf, formatDate, formatPhone } from "@/utils/format";
-import { cancelOrder, deleteOrder, recheckPayment, revealCrediario, setCrediarioStatus, simulatePayment, updateFulfillment } from "../actions";
+import { addTrackingEvent, cancelOrder, deleteOrder, recheckPayment, revealCrediario, setCrediarioStatus, simulatePayment, toggleTrackingEvent, updateFulfillment } from "../actions";
+import { stageDefs } from "@/lib/delivery";
+import { syncOrderTracking } from "@/server/delivery";
+import { getSettingsFresh } from "@/server/settings";
 
 export const metadata = { title: "Pedido" };
 
@@ -27,6 +30,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     include: { customer: true, items: true, payments: true, paymentEvents: { orderBy: { createdAt: "asc" } }, crediario: true, utm: true },
   });
   if (!order) notFound();
+  const settings = await getSettingsFresh();
+  await syncOrderTracking(order, settings).catch(() => 0);
+  const stages = stageDefs(settings);
+  const tracking = await db.orderTrackingEvent.findMany({ where: { orderId: order.id }, orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }] });
   const [webhooks, events] = await Promise.all([
     db.webhookEvent.findMany({ where: { OR: [{ orderId: order.id }, ...(order.transactionId ? [{ transactionId: order.transactionId }] : [])] }, orderBy: { receivedAt: "asc" } }),
     order.sessionId ? db.trackingEvent.findMany({ where: { sessionId: order.sessionId }, orderBy: { createdAt: "asc" }, take: 150, select: { id: true, name: true, element: true, path: true, createdAt: true } }) : Promise.resolve([]),
@@ -110,7 +117,58 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </dl>
           </Card>
 
-          <Card title="Linha do tempo">
+          {isPaidStatus(order.status) && (
+            <Card title="Rastreio da entrega (visto pelo cliente)" actions={<Link href={`/rastrear-pedido?pedido=${order.orderNumber}`} target="_blank" className="text-xs font-semibold text-blue-700 underline">Abrir rastreio</Link>}>
+              {tracking.length ? (
+                <ol className="space-y-2 text-sm">
+                  {tracking.map((e) => (
+                    <li key={e.id} className={`flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg border p-2.5 ${e.hidden ? "border-dashed border-slate-300 bg-slate-50 opacity-60" : "border-slate-200"}`}>
+                      <span className="w-32 shrink-0 text-xs text-slate-500">{formatDate(e.occurredAt, true)}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">
+                          {e.title} {e.automatic ? <Badge>automático</Badge> : <Badge tone="blue">manual</Badge>} {e.hidden && <Badge tone="amber">oculto</Badge>}
+                        </p>
+                        {e.description && <p className="text-xs text-slate-500">{e.description}</p>}
+                        {(e.note || e.createdBy) && <p className="text-xs text-slate-400">{[e.createdBy, e.note].filter(Boolean).join(" · ")}</p>}
+                      </div>
+                      <ActionForm action={toggleTrackingEvent}>
+                        <input type="hidden" name="eventId" value={e.id} />
+                        <button className="text-xs font-semibold text-slate-600 underline">{e.hidden ? "Reexibir" : "Ocultar (correção)"}</button>
+                      </ActionForm>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-slate-500">As etapas automáticas aparecem conforme os horários programados.</p>
+              )}
+              {!tracking.some((e) => e.status === "DELIVERED" && !e.hidden) && (
+                <ActionForm action={addTrackingEvent} className="mt-3">
+                  <input type="hidden" name="id" value={order.id} />
+                  <input type="hidden" name="status" value="DELIVERED" />
+                  <SubmitButton>Marcar como entregue</SubmitButton>
+                </ActionForm>
+              )}
+              <details className="mt-4 rounded-lg border border-slate-200 p-3">
+                <summary className="cursor-pointer text-sm font-semibold">Adicionar atualização manual</summary>
+                <ActionForm action={addTrackingEvent} resetOnSuccess className="mt-3 grid gap-3 md:grid-cols-2">
+                  <input type="hidden" name="id" value={order.id} />
+                  <Field label="Etapa">
+                    <select name="status" defaultValue="NOTE" className={inputCls}>
+                      <option value="NOTE">Atualização personalizada</option>
+                      {stages.filter((d) => d.code !== "PAID").map((d) => <option key={d.code} value={d.code}>{d.title}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Data e hora (Brasília)" hint="Vazio = agora"><input type="datetime-local" name="occurredAt" className={inputCls} /></Field>
+                  <Field label="Título" hint="Vazio = título padrão da etapa" className="md:col-span-2"><input name="title" className={inputCls} /></Field>
+                  <Field label="Descrição (visível ao cliente)" className="md:col-span-2"><textarea name="description" rows={2} className={textareaCls} /></Field>
+                  <Field label="Observação interna" className="md:col-span-2"><input name="note" className={inputCls} /></Field>
+                  <div className="md:col-span-2"><SubmitButton>Adicionar à linha do tempo</SubmitButton></div>
+                </ActionForm>
+              </details>
+            </Card>
+          )}
+
+          <Card title="Histórico do pedido">
             <ol className="space-y-2 text-sm">
               {order.paymentEvents.map((e) => (
                 <li key={e.id} className="flex gap-3">

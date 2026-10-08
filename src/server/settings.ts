@@ -81,3 +81,6 @@ export function googleIds(s: Settings) {
     adsPurchaseLabel: /^[A-Za-z0-9_-]{4,40}$/.test(label) ? label : null,
   };
 }
+
+/** Frete cobrado: 0 com "frete grátis" ativo; senão o valor fixo configurado. */
+export const shippingCentsFrom = (s: Settings) => (isOn(s.shipping_free_enabled) ? 0 : Math.max(0, settingInt(s, "shipping_flat_cents", 0)));

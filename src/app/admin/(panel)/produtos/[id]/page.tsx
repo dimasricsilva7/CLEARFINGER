@@ -25,9 +25,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {p && <input type="hidden" name="id" value={p.id} />}
         <Card title="Dados do produto">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm font-medium md:col-span-2"><input type="checkbox" name="active" defaultChecked={p?.active ?? true} className="h-4 w-4" /> Ativo (à venda)</label>
+            <div className="flex flex-wrap gap-6 md:col-span-2">
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="active" defaultChecked={p?.active ?? true} className="h-4 w-4" /> Ativo (à venda)</label>
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="featured" defaultChecked={p?.featured ?? false} className="h-4 w-4" /> Destaque</label>
+            </div>
             <Field label="Nome"><input name="name" required defaultValue={p?.name ?? ""} className={inputCls} /></Field>
             <Field label="Nome curto" hint="Usado no checkout e resumos"><input name="shortName" defaultValue={p?.shortName ?? ""} className={inputCls} /></Field>
+            <Field label="Subtítulo" className="md:col-span-2" hint="Ex.: Neutralizador de Odores para Tecidos, Carro e Ambientes"><input name="subtitle" defaultValue={p?.subtitle ?? ""} className={inputCls} /></Field>
             <Field label="Slug"><input name="slug" defaultValue={p?.slug ?? ""} className={inputCls} /></Field>
             <Field label="SKU"><input name="sku" defaultValue={p?.sku ?? ""} className={inputCls} /></Field>
             <Field label="Descrição curta" className="md:col-span-2"><textarea name="shortDescription" rows={2} defaultValue={p?.shortDescription ?? ""} className={textareaCls} /></Field>
@@ -37,6 +41,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <Field label="Texto de desconto" hint="Vazio = calculado"><input name="discountLabel" defaultValue={p?.discountLabel ?? ""} className={inputCls} /></Field>
             <Field label="Estoque (unidades)" hint="Vazio = sem controle. É baixado quando a venda é confirmada."><input name="stockQuantity" inputMode="numeric" defaultValue={p?.stockQuantity ?? ""} className={inputCls} /></Field>
             <Field label="Selo"><input name="badge" defaultValue={p?.badge ?? ""} className={inputCls} /></Field>
+            <Field label="Texto do botão (CTA)" hint="Ex.: Adicionar ao pedido"><input name="ctaLabel" defaultValue={p?.ctaLabel ?? ""} className={inputCls} /></Field>
+            <Field label="Ordem" hint="Menor = primeiro. O produto principal da landing é o ativo com kits e menor ordem."><input name="sortOrder" type="number" defaultValue={p?.sortOrder ?? 0} className={inputCls} /></Field>
             <div className="md:col-span-2"><VideoInput name="videoUrl" label="Vídeo do produto (usado na demonstração se a seção não tiver vídeo próprio)" defaultValue={p?.videoUrl} /></div>
           </div>
         </Card>

@@ -8,7 +8,7 @@ import { formatBRL } from "@/utils/format";
 export const metadata = { title: "Produtos" };
 
 export default async function ProductsPage() {
-  const products = await db.product.findMany({ include: { images: { where: { role: "MAIN" }, take: 1 }, _count: { select: { offers: true } } }, orderBy: { createdAt: "asc" } });
+  const products = await db.product.findMany({ include: { images: { where: { role: "MAIN" }, take: 1 }, _count: { select: { offers: true } } }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
   return (
     <div>
       <PageHeader title="Produtos" description="A landing vende o primeiro produto ativo. Kits e preços de venda ficam em Ofertas." actions={<Link href="/admin/produtos/novo" className={btnPrimary}>Novo produto</Link>} />

@@ -37,7 +37,7 @@ function parseConfig(type: string, fd: FormData, prev: Record<string, unknown>):
       c.points = stringList(fd, "cfg_points").slice(0, 8);
       break;
     case "how_it_works":
-      c.steps = jsonArray<{ title?: string; text?: string }>(fd, "cfg_steps").filter((s) => s?.title).slice(0, 6).map((s) => ({ title: String(s.title).slice(0, 60), text: String(s.text ?? "").slice(0, 300) }));
+      c.steps = jsonArray<{ title?: string; text?: string; imageUrl?: string }>(fd, "cfg_steps").filter((s) => s?.title).slice(0, 6).map((s) => ({ title: String(s.title).slice(0, 60), text: String(s.text ?? "").slice(0, 300), imageUrl: /^(https:\/\/|\/)/.test(String(s.imageUrl ?? "")) ? String(s.imageUrl).slice(0, 1000) : "" }));
       c.note = str(fd, "cfg_note", 300);
       break;
     case "demo":

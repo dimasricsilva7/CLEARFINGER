@@ -7,10 +7,10 @@ import type { PublicBump, PublicImage, PublicOffer, PublicProduct } from "@/type
 const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 async function loadMainProduct() {
-  // O produto principal é o primeiro ativo (o projeto suporta vários; a landing vende um)
+  // O produto principal é o ativo com kits e menor ordem (os complementares entram como order bump / upsell)
   return db.product.findFirst({
-    where: { active: true },
-    orderBy: { createdAt: "asc" },
+    where: { active: true, offers: { some: { active: true } } },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: { images: { orderBy: [{ role: "asc" }, { sortOrder: "asc" }] }, offers: { where: { active: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
   });
 }

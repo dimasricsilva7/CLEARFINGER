@@ -1,7 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/request";
-import { ensurePix, findOrderByAccess, renewPix, syncOrder, toPublicOrder } from "@/server/orders";
+import { ensurePix, findOrderByAccess, renewPix, syncOrder, toPublicOrder, withOrderExtras } from "@/server/orders";
 import { maybeReconcileOpportunistically } from "@/server/jobs";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     order = (await findOrderByAccess(sp.get("pedido"), sp.get("t")))!;
   }
   after(() => maybeReconcileOpportunistically());
-  return NextResponse.json(toPublicOrder(order), { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(await withOrderExtras(order, toPublicOrder(order)), { headers: { "Cache-Control": "no-store" } });
 }
 
 /** "Gerar novo PIX": o PIX anterior expirou. POST para links de e-mail/scanners nunca criarem cobranças. */

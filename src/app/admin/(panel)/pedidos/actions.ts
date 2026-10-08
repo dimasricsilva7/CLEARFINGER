@@ -12,6 +12,9 @@ import { withAdmin, type ActionResult } from "@/server/admin/guard";
 import { optStr, str } from "@/server/admin/forms";
 import { logOrderEvent, syncOrder, updateCrediarioStatus } from "@/server/orders";
 import { handleBravopayWebhook } from "@/server/webhooks";
+import { syncOrderTracking } from "@/server/delivery";
+import { getSettingsFresh } from "@/server/settings";
+import { stageDefs, zonedTime } from "@/lib/delivery";
 
 /** Entrega — só para pedidos com venda confirmada (PIX pago ou crediário aprovado/concluído). */
 export async function updateFulfillment(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -131,5 +134,46 @@ export async function deleteOrder(_: ActionResult, fd: FormData): Promise<Action
     revalidatePath("/admin/pedidos");
     if (str(fd, "back", 10) === "1") redirect("/admin/pedidos");
     return { ok: true, message: `Pedido ${order.orderNumber} excluído.` };
+  });
+}
+
+// ───────────── Rastreio da entrega (linha do tempo) ─────────────
+
+const MANUAL_STATUSES = ["SEPARATING", "DC_ARRIVED", "DISPATCHED", "DEST_DC_ARRIVED", "OUT_FOR_DELIVERY", "DELIVERED", "NOTE"];
+
+/** Lança um evento manual (ou marca como entregue). Nada é sobrescrito: o histórico automático permanece. */
+export async function addTrackingEvent(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("EDITOR", async (admin) => {
+    const id = str(fd, "id", 40);
+    const status = str(fd, "status", 30);
+    if (!MANUAL_STATUSES.includes(status)) return { error: "Etapa inválida." };
+    const order = await db.order.findUniqueOrThrow({ where: { id } });
+    if (!isPaidStatus(order.status)) return { error: "A linha do tempo só existe para pedidos pagos/aprovados." };
+    const settings = await getSettingsFresh();
+    const def = stageDefs(settings).find((d) => d.code === status);
+    const title = str(fd, "title", 140) || def?.title || "Atualização do pedido";
+    const description = optStr(fd, "description", 500) ?? def?.description ?? null;
+    const when = str(fd, "occurredAt", 20);
+    const m = when.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/);
+    const occurredAt = m ? zonedTime(m[1], Number(m[2]), Number(m[3])) : new Date();
+    if (occurredAt.getTime() > Date.now() + 5 * 60_000) return { error: "A data do evento não pode estar no futuro." };
+    await db.orderTrackingEvent.create({ data: { orderId: id, status, title, description, occurredAt, automatic: false, note: optStr(fd, "note", 500), createdBy: admin.email } });
+    await syncOrderTracking(order, settings);
+    await logOrderEvent(id, "tracking", `Rastreio: "${title}" lançado manualmente (admin ${admin.email})`);
+    await audit(admin.id, "order_tracking_added", "order", id, { summary: `Pedido ${order.orderNumber}: evento de rastreio "${title}"` });
+    revalidatePath(`/admin/pedidos/${id}`);
+    return { ok: true, message: status === "DELIVERED" ? "Pedido marcado como entregue." : "Evento adicionado à linha do tempo." };
+  });
+}
+
+/** Correção: oculta/reexibe um evento para o cliente (fica no histórico do admin). */
+export async function toggleTrackingEvent(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("EDITOR", async (admin) => {
+    const eventId = str(fd, "eventId", 40);
+    const ev = await db.orderTrackingEvent.findUniqueOrThrow({ where: { id: eventId } });
+    const updated = await db.orderTrackingEvent.update({ where: { id: eventId }, data: { hidden: !ev.hidden, note: [ev.note, `${ev.hidden ? "Reexibido" : "Ocultado"} por ${admin.email} em ${new Date().toISOString()}`].filter(Boolean).join(" · ").slice(0, 1000) } });
+    await audit(admin.id, "order_tracking_toggled", "order", ev.orderId, { summary: `Evento de rastreio "${ev.title}" ${updated.hidden ? "ocultado" : "reexibido"}` });
+    revalidatePath(`/admin/pedidos/${ev.orderId}`);
+    return { ok: true, message: updated.hidden ? "Evento ocultado para o cliente." : "Evento visível novamente." };
   });
 }

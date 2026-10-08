@@ -26,9 +26,15 @@ const GROUPS: { title: string; items: { href: string; label: string; owner?: boo
     title: "Catálogo",
     items: [
       { href: "/admin/produtos", label: "Produtos" },
-      { href: "/admin/ofertas", label: "Ofertas e kits" },
-      { href: "/admin/order-bumps", label: "Order bumps" },
+      { href: "/admin/ofertas", label: "Kits e preços" },
       { href: "/admin/imagens", label: "Imagens" },
+    ],
+  },
+  {
+    title: "Ofertas",
+    items: [
+      { href: "/admin/order-bumps", label: "Order bump" },
+      { href: "/admin/upsells", label: "Upsell" },
     ],
   },
   {

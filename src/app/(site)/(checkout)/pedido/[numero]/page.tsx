@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { crediarioConfig } from "@/lib/crediario";
-import { findOrderByAccess, toPublicOrder } from "@/server/orders";
+import { findOrderByAccess, toPublicOrder, withOrderExtras } from "@/server/orders";
 import { getSettings } from "@/server/settings";
 import { getMainProduct } from "@/server/catalog";
 import { whatsappLink } from "@/components/layout/Footer";
@@ -26,7 +26,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
     );
   }
   const [s, product] = await Promise.all([getSettings(), getMainProduct()]);
-  const pub = toPublicOrder(order);
+  const pub = await withOrderExtras(order, toPublicOrder(order));
   const qrSvg = pub.pixCopyPaste ? await QRCode.toString(pub.pixCopyPaste, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#0B2545", light: "#FFFFFF" } }) : null;
   const wa = s.whatsapp ? whatsappLink(s.whatsapp, `Olá! Tenho uma dúvida sobre o pedido ${pub.orderNumber}.`) : null;
   const cfg = crediarioConfig(s);

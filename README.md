@@ -13,7 +13,7 @@ O projeto reaproveita a base já em produção dos projetos **HAMA BEADS** (pedi
 | Banco | PostgreSQL (Neon) + Prisma 6 |
 | Pagamento | BravoPay (PIX) · Crediário próprio (sem gateway) |
 | Imagens | sharp → WebP guardado no Postgres, servido por `/media/[id].webp` com cache imutável de CDN |
-| Deploy | Vercel (região `iad1`), cron diário + GitHub Actions a cada 5 min |
+| Deploy | Vercel (região `iad1`), domínio `clearfinger.shop` com HTTPS (Let's Encrypt automático + HSTS), cron diário + GitHub Actions a cada 5 min |
 
 ## Estrutura
 
@@ -50,6 +50,7 @@ npm run typecheck && npm run lint && npm test         # tipos, lint, unitários
 npx tsx scripts/e2e-funnel.ts http://localhost:3000   # ponta a ponta: PIX + webhook + crediário + admin (mock!)
 npx tsx scripts/e2e-images.ts http://localhost:3000   # envio de imagens por arquivo e por URL
 npx tsx scripts/screenshots.ts http://localhost:3000 / screenshots   # 375 / 390 / 1440 px
+npx tsx scripts/review-mobile.ts http://localhost:3000 screenshots     # 375 / 390 / 414 px sem rolagem horizontal
 ```
 
 > Nunca rode os testes E2E contra produção com a BravoPay real — eles criam pedidos.
@@ -77,6 +78,21 @@ Cadastre no painel BravoPay: `https://SEU-DOMINIO/api/webhooks/bravopay` e copie
 - Protocolo, validade e dígitos do CPF ficam **cifrados (AES-256-GCM)** no banco; o admin vê o CPF como `***123` e o protocolo mascarado, com botão "ver completo" (registrado na auditoria). Esses dados nunca vão para URL, logs, eventos de tracking, Meta ou Google.
 - **Todos os textos e regras** (nome do método, títulos, placeholders, dígitos, formato da validade, máximo de parcelas, texto das parcelas, mensagens, botão, texto de segurança) ficam em **Admin → Pagamentos → Crediário**, com prévia ao vivo. Mudanças valem na hora, sem deploy.
 
+## Entrega, frete e rastreio
+
+- **Frete**: Admin → Configurações → **Entrega** — liga/desliga frete grátis, texto do frete, prazo ("3 a 5 dias úteis"), texto do prazo e do checkout. Aparece no hero, nos kits, no CTA final, no resumo do checkout e na página do pedido.
+- **Linha do tempo automática** (`src/lib/delivery.ts`, testada em `tests/delivery.test.ts`): a partir do pagamento confirmado (PIX pago ou crediário aprovado), fuso America/Sao_Paulo, só dias úteis (fins de semana e feriados configurados são pulados):
+  1. Pagamento concluído — na hora · 2. Separando pedido — próximo dia útil 10:30 · 3. Chegou ao centro de distribuição — mesmo dia 16:30 · 4. Despachado para a cidade de destino — dia útil seguinte 09:30 · 5. Chegou ao CD da cidade destino — mesmo dia 16:30 · 6. Saiu para entrega — dia útil seguinte 10:30 · **Entregue — só manual**.
+- **Agendador global**: nenhum cron por pedido. As etapas vencidas são gravadas em `OrderTrackingEvent` pelo job (`/api/cron/all`, `/api/tick`) e também na hora em que o cliente ou o admin abre o pedido. `Order.fulfillmentStatus` acompanha (Em preparação → Enviado → Entregue).
+- **Admin → Pedido → Rastreio da entrega**: mostra cada evento como automático/manual, permite lançar atualização manual (etapa, data/hora, título, descrição, observação interna), **Marcar como entregue** e ocultar um evento para corrigir — nada é apagado. Títulos/descrições de cada etapa, feriados e a automação ficam em Configurações → Entrega.
+- **/rastrear-pedido** (link no cabeçalho e no rodapé): número do pedido + CPF **ou** e-mail. Rate limit em memória e persistente (por IP e por pedido), mesma resposta genérica para pedido inexistente e dado errado, atraso uniforme, nenhum dado pessoal na resposta. Eventos: `tracking_page_view, tracking_search_started, tracking_order_found, tracking_order_not_found, tracking_status_viewed` — só no tracking próprio, sem número do pedido, CPF ou e-mail.
+
+## Ofertas (Order bump e Upsell)
+
+- **Admin → Ofertas → Order bump**: "Adicione também ao seu pedido" no checkout (título/texto em Configurações → Checkout). Cada bump aponta para um produto (ex.: frasco extra, CLEARFINGER HAND CARE, CLEARFINGER ODOR CONTROL), com preço, texto, imagem, ordem e status.
+- **Admin → Ofertas → Upsell**: oferta na página do pedido depois da compra (PIX pago e/ou pedido no crediário), com produto, título, descrição, preço, imagem, textos dos botões, posição e ordem. **Aceitar** cria um novo pedido PIX vinculado (`Order.parentOrderId`, `source = UPSELL`); **recusar** só esconde. O pedido original nunca é alterado. Métricas de exibição/aceite/recusa na própria página.
+- Produtos complementares (`prisma/update-2026-10-08b.ts`): **CLEARFINGER HAND CARE** e **CLEARFINGER ODOR CONTROL** foram criados **inativos, sem imagem e com preço provisório** — assim como os bumps/upsell deles. Cadastre a foto real e o preço em Produtos e ative.
+
 ## Tracking
 
 - **Próprio** (`VisitorSession` + `TrackingEvent`): visitor_id (cookie `cf_vid`, 1 ano), sessão de 30 min, UTMs first/last touch, `fbclid`/`gclid`/`ttclid`, `adset`/`ad`, dispositivo. Eventos do navegador vão em lote para `/api/track`; eventos críticos (pedido, PIX, compra, crediário) são gravados no servidor e ligados à mesma sessão.
@@ -91,7 +107,7 @@ Cadastre no painel BravoPay: `https://SEU-DOMINIO/api/webhooks/bravopay` e copie
 
 `/admin` — login com bcrypt, sessão httpOnly de 12 h, bloqueio após tentativas, papéis OWNER/ADMIN/EDITOR, auditoria de todas as alterações.
 
-Dashboard (PIX e crediário separados, gráficos, filtro de período) · Funil · Métricas (pagamentos e UTMs) · Tracking e online · Pedidos · Clientes · Produtos (imagens principal/secundária/galeria) · Ofertas e kits · Order bumps (produto, preço, textos e imagem) · Imagens (upload de arquivo **ou** URL) · Landing page (ordem, visibilidade, cor de fundo e conteúdo de cada seção) · Depoimentos · FAQ · Pagamentos (PIX, Crediário) · Webhooks · Configurações (marca, empresa, aparência, checkout/envio, tracking, SEO, políticas, sistema) · Auditoria · Usuários.
+Dashboard (PIX e crediário separados, gráficos, filtro de período) · Funil · Métricas (pagamentos e UTMs) · Tracking e online · Pedidos (com rastreio da entrega) · Clientes · Produtos (subtítulo, CTA, destaque, ordem, imagens principal/secundária/galeria) · Kits e preços · Ofertas → Order bump e Upsell · Imagens (upload de arquivo **ou** URL) · Landing page (ordem, visibilidade, cor de fundo e conteúdo de cada seção; "Como usar" com imagem por passo e vídeo vertical) · Depoimentos · FAQ · Pagamentos (PIX, Crediário) · Webhooks · Configurações (marca, empresa, aparência, checkout, entrega, tracking, SEO, políticas, sistema) · Auditoria · Usuários.
 
 **Imagens**: todo campo de imagem tem *Enviar arquivo* (escolher ou arrastar), *Usar URL* (guardar uma cópia otimizada no site ou usar o link direto) e *Biblioteca*. Links internos/privados são bloqueados (proteção SSRF).
 

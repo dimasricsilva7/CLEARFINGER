@@ -14,10 +14,14 @@ export function Header({ name, logoUrl, ctaLabel, announcement }: { name: string
             <Link href="/#como-funciona" className="hover:text-navy">Como usar</Link>
             <Link href="/#ofertas" className="hover:text-navy">Kits e preços</Link>
             <Link href="/#faq" className="hover:text-navy">Dúvidas</Link>
+            <Link href="/rastrear-pedido" className="hover:text-navy">Rastrear pedido</Link>
           </nav>
+          <div className="flex items-center gap-1">
+          <Link href="/rastrear-pedido" className="inline-flex min-h-[40px] items-center px-2 text-[13px] font-semibold text-muted hover:text-navy md:hidden">Rastrear</Link>
           <Link href="/#ofertas" data-cta="header_cta" className="inline-flex min-h-[40px] items-center rounded-lg bg-navy px-4 text-sm font-bold text-white hover:bg-navy/90">
             {ctaLabel}
           </Link>
+          </div>
         </div>
       </header>
     </>

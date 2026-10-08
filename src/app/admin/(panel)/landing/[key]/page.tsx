@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Field, PageHeader, inputCls, textareaCls, btnSecondary } from "@/components/admin/ui";
 import { ActionForm, SubmitButton } from "@/components/admin/client";
-import { IconItemsEditor, ImageField, StepsEditor, StringListEditor, VideoInput } from "@/components/admin/inputs";
+import { IconItemsEditor, ImageField, StepsWithImagesEditor, StringListEditor, VideoInput } from "@/components/admin/inputs";
 import { SECTION_TYPES, type SectionType } from "@/lib/domain";
 import { db } from "@/lib/db";
 import { saveSection } from "../../cms-actions";
@@ -17,7 +17,7 @@ const USES: Record<string, { subtitle?: boolean; body?: boolean; image?: string;
   hero: { subtitle: true, image: "Imagem do produto (vazio = imagem principal do produto)", cta: true },
   pain: { subtitle: true, body: true, image: "Foto da seção (pessoa/mãos — use fotos com licença de uso)" },
   solution: { body: true, image: "Imagem (vazio = imagem secundária/principal do produto)", cta: true },
-  how_it_works: { subtitle: true },
+  how_it_works: { subtitle: true, video: true },
   demo: { subtitle: true, image: "Imagem única de demonstração (opcional)", video: true },
   benefits: { subtitle: true },
   testimonials: { subtitle: true },
@@ -99,8 +99,8 @@ export default async function EditSectionPage({ params }: { params: Promise<{ ke
               {t === "how_it_works" && (
                 <>
                   <div className="md:col-span-2">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Passos (01, 02, 03…) — use as instruções reais de uso</p>
-                    <StepsEditor name="cfg_steps" defaultValue={arr(c.steps)} />
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Passos (01, 02, 03…) com imagem da aplicação — use as instruções reais de uso</p>
+                    <StepsWithImagesEditor name="cfg_steps" defaultValue={arr(c.steps)} />
                   </div>
                   <Field label="Observação" className="md:col-span-2"><input name="cfg_note" defaultValue={s(c.note)} className={inputCls} /></Field>
                 </>

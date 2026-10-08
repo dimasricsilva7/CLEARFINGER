@@ -58,15 +58,15 @@ const SECTIONS: { key: string; type: string; label: string; data: Partial<Prisma
     type: "how_it_works",
     label: "Como funciona",
     data: {
-      title: "Como usar",
-      subtitle: "Três passos, no seu ritmo.",
+      title: "Como usar — veja como funciona",
+      subtitle: "Três passos simples, no seu ritmo.",
       config: {
         steps: [
-          { title: "Aplique", text: "Aplique o produto sobre as áreas amareladas dos dedos e das unhas." },
-          { title: "Limpe", text: "Espalhe e limpe a região conforme as instruções da embalagem." },
-          { title: "Finalize", text: "Lave as mãos e repita no dia a dia, seguindo a orientação de uso." },
+          { title: "Aplique", text: "Aplique o produto sobre as áreas amareladas dos dedos e das unhas.", imageUrl: "/brand/step-1.webp" },
+          { title: "Limpe", text: "Espalhe e limpe a região conforme as instruções da embalagem.", imageUrl: "/brand/step-2.webp" },
+          { title: "Veja a diferença", text: "Mãos com aparência mais limpa. Repita no dia a dia, seguindo a orientação de uso.", imageUrl: "/brand/step-3.webp" },
         ],
-        note: "Siga sempre as instruções de uso que acompanham o produto.",
+        note: "Imagens ilustrativas. Siga sempre as instruções de uso que acompanham o produto.",
       },
     },
   },
@@ -173,7 +173,7 @@ async function main() {
       shortName: "CLEARFINGER",
       shortDescription: "Removedor de manchas de nicotina para mãos e unhas. Frasco de 30 mL com válvula pump.",
       description: "Removedor de manchas de nicotina desenvolvido para mãos e unhas. Ajuda a remover a aparência amarelada deixada pelo cigarro nos dedos e nas unhas. Uso externo.",
-      priceCents: 5990,
+      priceCents: 3990,
       benefits: [
         { icon: "sparkle", title: "Ajuda a remover manchas amareladas" },
         { icon: "drop", title: "Fácil de usar" },
@@ -184,14 +184,14 @@ async function main() {
         { label: "Indicação", value: "Mãos e unhas" },
         { label: "Uso", value: "Externo" },
       ],
-      images: { create: [{ url: "/brand/kit-cutout.webp", alt: "Caixa e frasco do CLEARFINGER, removedor de manchas de nicotina, 30 mL", role: "MAIN", sortOrder: 0 }] },
+      images: { create: [{ url: "/brand/kit-photo.webp", alt: "Caixa e frasco do CLEARFINGER, removedor de manchas de nicotina, 30 mL", role: "MAIN", sortOrder: 0 }] },
     },
   });
 
   const offers = [
-    { slug: "kit-1", name: "1 unidade", quantity: 1, priceCents: 5990, compareAtPriceCents: null, badge: null, highlight: false, description: "Para começar a usar.", sortOrder: 1 },
-    { slug: "kit-2", name: "Kit com 2 unidades", quantity: 2, priceCents: 9990, compareAtPriceCents: 11980, badge: "Recomendado", highlight: true, description: "Uma para casa e outra para levar com você.", sortOrder: 2 },
-    { slug: "kit-3", name: "Kit com 3 unidades", quantity: 3, priceCents: 13490, compareAtPriceCents: 17970, badge: "Menor preço por unidade", highlight: false, description: "Para usar por mais tempo sem precisar repor.", sortOrder: 3 },
+    { slug: "kit-1", name: "1 unidade", quantity: 1, priceCents: 3990, compareAtPriceCents: null, badge: null, highlight: false, description: "Para começar a usar.", sortOrder: 1 },
+    { slug: "kit-2", name: "2 unidades", quantity: 2, priceCents: 5990, compareAtPriceCents: 7980, badge: "Mais vendido", highlight: true, description: "Uma para casa e outra para levar com você.", sortOrder: 2 },
+    { slug: "kit-3", name: "3 unidades", quantity: 3, priceCents: 8990, compareAtPriceCents: 11970, badge: "Tratamento completo", highlight: false, description: "Para usar por mais tempo sem precisar repor.", sortOrder: 3 },
   ];
   for (const o of offers) await db.productOffer.upsert({ where: { slug: o.slug }, update: {}, create: { ...o, productId: product.id } });
 

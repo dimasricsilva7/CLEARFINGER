@@ -31,6 +31,10 @@ export async function saveProduct(_: ActionResult, fd: FormData): Promise<Action
     const data = {
       name,
       shortName: optStr(fd, "shortName", 80),
+      subtitle: optStr(fd, "subtitle", 160),
+      ctaLabel: optStr(fd, "ctaLabel", 40),
+      featured: bool(fd, "featured"),
+      sortOrder: int(fd, "sortOrder", 0),
       slug: slugify(str(fd, "slug", 80) || name),
       sku: str(fd, "sku", 40).toUpperCase() || slugify(name).toUpperCase().slice(0, 30),
       shortDescription: optStr(fd, "shortDescription", 400),
@@ -244,6 +248,65 @@ export async function deleteBump(_: ActionResult, fd: FormData): Promise<ActionR
     const b = await db.orderBump.delete({ where: { id } });
     await audit(admin.id, "bump_deleted", "orderBump", id, { summary: `Order bump removido: ${b.title}` });
     revalidatePath("/admin/order-bumps");
+    return { ok: true, message: "Removido." };
+  });
+}
+
+// ───────────── Upsell (oferta pós-compra) ─────────────
+
+const UPSELL_TRIGGERS = ["ANY_CONFIRMED", "PIX_PAID", "CREDIARIO_CREATED"];
+
+export async function saveUpsell(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("ADMIN", async (admin) => {
+    const id = optStr(fd, "id", 40);
+    const productId = str(fd, "productId", 40);
+    const priceCents = parseMoney(fd.get("price"));
+    const compare = parseMoney(fd.get("compareAtPrice"));
+    if (!(await db.product.findUnique({ where: { id: productId }, select: { id: true } }))) return { error: "Escolha o produto do upsell." };
+    if (priceCents == null || priceCents <= 0) return { error: "Informe um preço válido." };
+    const trigger = str(fd, "trigger", 30);
+    const data = {
+      productId,
+      name: str(fd, "name", 80) || str(fd, "title", 80),
+      title: str(fd, "title", 120),
+      description: optStr(fd, "description", 400),
+      quantity: Math.max(1, Math.min(20, int(fd, "quantity", 1))),
+      priceCents,
+      compareAtPriceCents: compare && compare > priceCents ? compare : null,
+      imageUrl: url(fd, "imageUrl"),
+      badge: optStr(fd, "badge", 40),
+      acceptLabel: str(fd, "acceptLabel", 60) || "Sim, quero adicionar",
+      declineLabel: str(fd, "declineLabel", 60) || "Não, obrigado",
+      trigger: UPSELL_TRIGGERS.includes(trigger) ? trigger : "ANY_CONFIRMED",
+      position: str(fd, "position", 10) === "BOTTOM" ? "BOTTOM" : "TOP",
+      sortOrder: int(fd, "sortOrder", 0),
+      active: bool(fd, "active"),
+    };
+    if (!data.title) return { error: "Informe o título do upsell." };
+    if (id) {
+      const before = await db.upsell.findUniqueOrThrow({ where: { id } });
+      const after = await db.upsell.update({ where: { id }, data });
+      await audit(admin.id, "upsell_updated", "upsell", id, { summary: `Upsell "${after.title}" atualizado`, before: asRecord(before), after: asRecord(after) });
+    } else {
+      const created = await db.upsell.create({ data });
+      await audit(admin.id, "upsell_created", "upsell", created.id, { summary: `Upsell criado: ${created.title}` });
+    }
+    revalidatePath("/admin/upsells");
+    return { ok: true, message: "Upsell salvo. A página do pedido já mostra a nova versão." };
+  });
+}
+
+export async function deleteUpsell(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("ADMIN", async (admin) => {
+    const id = str(fd, "id", 40);
+    if (await db.order.count({ where: { upsellId: id } })) {
+      await db.upsell.update({ where: { id }, data: { active: false } });
+      revalidatePath("/admin/upsells");
+      return { ok: true, message: "O upsell já gerou pedidos e foi apenas desativado (histórico preservado)." };
+    }
+    const u = await db.upsell.delete({ where: { id } });
+    await audit(admin.id, "upsell_deleted", "upsell", id, { summary: `Upsell removido: ${u.title}` });
+    revalidatePath("/admin/upsells");
     return { ok: true, message: "Removido." };
   });
 }

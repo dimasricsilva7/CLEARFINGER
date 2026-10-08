@@ -10,6 +10,9 @@ import "dotenv/config";
 import fs from "fs";
 import crypto from "crypto";
 import { chromium, type Page } from "playwright";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
 const PASSWORD = fs.readFileSync(".admin-dev-password", "utf8").trim();
@@ -72,7 +75,7 @@ async function run() {
   await Promise.all([page.waitForURL(/\/pedido\//, { timeout: 90000 }), page.locator('[data-cta="checkout_submit"]').first().click()]);
   const pixUrl = page.url();
   ok(await page.locator('[data-cta="pix_copy"]').isVisible(), "PIX: página do pedido com código");
-  ok((await page.content()).includes("Adicione +1 frasco") && (await page.content()).includes("139,80"), "order bump: incluído no pedido e no total (R$ 139,80)");
+  ok((await page.content()).includes("Adicione +1 frasco") && (await page.content()).includes("99,80"), "order bump: incluído no pedido e no total (R$ 99,80)");
   await page.getByRole("button", { name: /Mostrar QR Code/ }).click();
   ok(await page.locator('[aria-label="QR Code do PIX"]').isVisible(), "PIX: QR Code exibido");
   await page.locator('[data-cta="pix_copy"]').click();
@@ -88,7 +91,7 @@ async function run() {
   await page.fill("#cred-validity", "1230");
   ok((await page.inputValue("#cred-validity")) === "12/30", "crediário: máscara da validade MM/AA");
   await page.fill("#cred-cpf", "725");
-  await page.getByText(/2x de R\$ 29,95/).click();
+  await page.getByText(/2x de R\$ 19,95/).click();
   await Promise.all([page.waitForURL(/\/pedido\//, { timeout: 90000 }), page.locator('[data-cta="checkout_submit"]').first().click()]);
   ok(await page.getByText("Pedido recebido!").isVisible(), "crediário: confirmação com texto do admin");
   ok(!(await page.content()).includes("1234567812345678"), "crediário: protocolo não aparece na página do cliente");
@@ -131,6 +134,59 @@ async function run() {
   await page.goto(pixUrl);
   ok(await page.getByRole("heading", { name: /Pagamento confirmado/ }).isVisible(), "PIX: cliente vê pagamento confirmado (Purchase)");
 
+  // ── Rastreio do pedido (linha do tempo automática + consulta pública) ──
+  await page.goto(pixUrl);
+  ok(await page.getByRole("heading", { name: "Acompanhe sua entrega" }).isVisible(), "pedido pago: linha do tempo de entrega na página do pedido");
+  ok(await page.getByText("Pagamento concluído").first().isVisible(), "linha do tempo: etapa 1 (Pagamento concluído) gerada na confirmação");
+  const lookup = (b: Record<string, string>) => fetch(`${BASE}/api/rastrear`, { method: "POST", headers: { "Content-Type": "application/json", Origin: BASE }, body: JSON.stringify(b) });
+  const okCpf = await lookup({ orderNumber: pixOrder.toLowerCase(), cpf: "529.982.247-25" });
+  const okCpfJson = await okCpf.json();
+  ok(okCpf.status === 200 && okCpfJson.events?.[0]?.status === "PAID" && okCpfJson.etaText?.includes("3 a 5 dias úteis"), "rastreio: pedido + CPF encontra o pedido (etapa 1 + prazo)");
+  ok(!JSON.stringify(okCpfJson).includes("52998224725") && !JSON.stringify(okCpfJson).includes("@example.com"), "rastreio: resposta sem CPF/e-mail");
+  const okMail = await lookup({ orderNumber: pixOrder, email: "nao@usado.com" });
+  ok(okMail.status === 404, "rastreio: e-mail errado → não encontrado");
+  const badCpf = await lookup({ orderNumber: pixOrder, cpf: "11144477735" });
+  const badCpfJson = await badCpf.json();
+  const noOrder = await lookup({ orderNumber: "CF00000-2026", cpf: "52998224725" });
+  const noOrderJson = await noOrder.json();
+  ok(badCpf.status === 404 && noOrder.status === 404 && badCpfJson.error === noOrderJson.error, "rastreio: CPF errado e pedido inexistente têm a mesma resposta genérica");
+  await page.goto(`${BASE}/rastrear-pedido?pedido=${pixOrder}`);
+  await page.fill("#cpf", "52998224725");
+  await page.getByRole("button", { name: "Rastrear pedido" }).click();
+  await page.getByText("Linha do tempo").waitFor({ timeout: 30000 });
+  ok(await page.getByText("Entrega estimada em 3 a 5 dias úteis").isVisible(), "rastreio (página): resultado com prazo e linha do tempo");
+  ok(await page.getByText("Pedido saiu para entrega").isVisible(), "rastreio (página): próximas etapas listadas");
+
+  // Admin: marcar como entregue (manual) → aparece no rastreio
+  await admin.goto(`${BASE}/admin/pedidos?q=${pixOrder}`);
+  await Promise.all([admin.waitForURL(/\/admin\/pedidos\/c/, { timeout: 90000 }), admin.getByRole("link", { name: pixOrder }).click()]);
+  ok(await admin.getByText("Rastreio da entrega (visto pelo cliente)").isVisible(), "admin: linha do tempo de entrega no pedido");
+  ok(await admin.getByText("automático").first().isVisible(), "admin: etapa marcada como automática");
+  await admin.getByRole("button", { name: "Marcar como entregue" }).click();
+  await admin.getByText("Pedido entregue").first().waitFor({ timeout: 60000 });
+  const delivered = await (await fetch(`${BASE}/api/rastrear`, { method: "POST", headers: { "Content-Type": "application/json", Origin: BASE }, body: JSON.stringify({ orderNumber: pixOrder, cpf: "52998224725" }) })).json();
+  ok(delivered.delivered === true && delivered.statusLabel === "Entregue", "rastreio: 'Entregue' manual refletido para o cliente");
+
+  // Upsell: ativa (produto + oferta) e aceita na página do pedido pago
+  const odor = await prisma.product.findUnique({ where: { slug: "clearfinger-odor-control" } });
+  const ups = odor ? await prisma.upsell.findFirst({ where: { productId: odor.id } }) : null;
+  if (odor && ups) {
+    await prisma.product.update({ where: { id: odor.id }, data: { active: true } });
+    await prisma.upsell.update({ where: { id: ups.id }, data: { active: true, priceCents: 2990 } });
+    await prisma.upsellEvent.deleteMany({ where: { upsellId: ups.id } });
+    await page.goto(pixUrl);
+    await page.locator("[data-testid=upsell]").waitFor({ timeout: 30000 });
+    ok(await page.getByText("Leve também o CLEARFINGER ODOR CONTROL").isVisible(), "upsell: exibido após o pagamento");
+    await Promise.all([page.waitForURL((u) => !u.toString().includes(pixOrder) && u.toString().includes("/pedido/"), { timeout: 90000 }), page.locator('[data-cta="upsell_accept"]').click()]);
+    ok(await page.locator('[data-cta="pix_copy"]').isVisible() && (await page.content()).includes("29,90"), "upsell: aceite gera novo pedido PIX (R$ 29,90)");
+    const parent = await prisma.order.findUnique({ where: { orderNumber: pixOrder }, include: { childOrders: true } });
+    ok(parent?.status === "PAID" && parent.childOrders.length === 1 && parent.childOrders[0].source === "UPSELL", "upsell: pedido original intacto e vinculado ao novo");
+    await page.goto(pixUrl);
+    ok((await page.locator("[data-testid=upsell]").count()) === 0, "upsell: não aparece de novo depois de aceito");
+    await prisma.upsell.update({ where: { id: ups.id }, data: { active: false } });
+    await prisma.product.update({ where: { id: odor.id }, data: { active: false } });
+  } else ok(false, "upsell: produto/oferta ODOR CONTROL não encontrados (rode prisma/update-2026-10-08b.ts)");
+
   // Crediário: dados mascarados + aprovação
   await admin.goto(`${BASE}/admin/pedidos?metodo=CREDIARIO&q=${credOrder}`);
   await Promise.all([admin.waitForURL(/\/admin\/pedidos\/c/, { timeout: 90000 }), admin.getByRole("link", { name: credOrder }).click()]);
@@ -159,17 +215,17 @@ async function run() {
   // Preço da oferta editável
   await admin.goto(`${BASE}/admin/ofertas`);
   const form = admin.locator("form", { has: admin.locator('input[name="slug"][value="kit-1"]') });
-  await form.locator('input[name="price"]').fill("57,90");
+  await form.locator('input[name="price"]').fill("37,90");
   await form.getByRole("button", { name: "Salvar oferta" }).click();
   await admin.getByText(/Oferta salva/).first().waitFor({ timeout: 60000 });
   await page.goto(BASE);
-  ok((await page.content()).includes("57,90"), "admin → landing: preço atualizado sem deploy");
-  await form.locator('input[name="price"]').fill("59,90");
+  ok((await page.content()).includes("37,90"), "admin → landing: preço atualizado sem deploy");
+  await form.locator('input[name="price"]').fill("39,90");
   await form.getByRole("button", { name: "Salvar oferta" }).click();
   await admin.getByText(/Oferta salva/).first().waitFor({ timeout: 60000 });
 
   // Todas as páginas do admin
-  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
+  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/upsells", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=entrega", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
     const res = await admin.goto(`${BASE}${path}`);
     const txt = await admin.locator("main").innerText().catch(() => "");
     ok(res?.status() === 200 && !/Application error|Unhandled Runtime Error/.test(txt), `admin ${path}`);
@@ -186,6 +242,7 @@ async function run() {
 
   ok(errors.length === 0, `sem erros de JavaScript (${errors.slice(0, 3).join(" | ")})`);
   await browser.close();
+  await prisma.$disconnect();
   console.log(failures ? `\n${failures} falha(s)` : "\nTudo certo.");
   process.exit(failures ? 1 : 0);
 }

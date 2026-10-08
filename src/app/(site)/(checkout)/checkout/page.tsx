@@ -3,7 +3,7 @@ import Link from "next/link";
 import { crediarioConfig } from "@/lib/crediario";
 import { bravopayMode } from "@/lib/env";
 import { getActiveBumps, getMainProduct } from "@/server/catalog";
-import { getSettings, isOn, settingInt } from "@/server/settings";
+import { getSettings, isOn, shippingCentsFrom } from "@/server/settings";
 import { CheckoutClient } from "./CheckoutClient";
 
 export const metadata: Metadata = { title: "Finalizar pedido", robots: { index: false, follow: false } };
@@ -31,8 +31,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       offers={product.offers}
       bumps={bumps}
       initialOfferId={initial.id}
-      shippingCents={Math.max(0, settingInt(s, "shipping_flat_cents", 0))}
-      shippingLabel={s.shipping_label}
+      shippingCents={shippingCentsFrom(s)}
+      shippingLabel={isOn(s.shipping_free_enabled) ? s.shipping_label : ""}
+      shippingEta={s.shipping_eta}
+      bumpTitle={s.bump_section_title || "Adicione também ao seu pedido"}
+      bumpText={s.bump_section_text}
       shippingNote={s.shipping_note}
       requireCpf={isOn(s.require_cpf)}
       consentLabel={s.marketing_consent_label}

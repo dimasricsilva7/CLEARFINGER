@@ -74,6 +74,8 @@ export function Footer({ s }: { s: Record<string, string> }) {
         <div>
           <p className="text-sm font-bold text-navy">Institucional</p>
           <ul className="mt-3 space-y-2 text-sm text-muted">
+            <li><Link href="/rastrear-pedido" className="font-semibold text-navy hover:underline">Rastrear pedido</Link></li>
+            <li><Link href="/contato" className="hover:text-navy">Contato</Link></li>
             <li><Link href="/politica-de-privacidade" className="hover:text-navy">Política de privacidade</Link></li>
             <li><Link href="/termos" className="hover:text-navy">Termos de uso</Link></li>
             <li><Link href="/trocas-e-devolucoes" className="hover:text-navy">Trocas e devoluções</Link></li>

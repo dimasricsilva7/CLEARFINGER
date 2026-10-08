@@ -98,6 +98,14 @@ export const TRACKED_EVENTS = [
   "crediario_approved",
   "crediario_rejected",
   "crediario_cancelled",
+  "upsell_view",
+  "upsell_accept",
+  "upsell_decline",
+  "tracking_page_view",
+  "tracking_search_started",
+  "tracking_order_found",
+  "tracking_order_not_found",
+  "tracking_status_viewed",
   "cookie_consent",
 ] as const;
 export type TrackedEvent = (typeof TRACKED_EVENTS)[number];
