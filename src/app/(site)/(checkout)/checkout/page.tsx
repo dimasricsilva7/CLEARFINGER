@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { crediarioConfig } from "@/lib/crediario";
 import { bravopayMode } from "@/lib/env";
-import { getMainProduct } from "@/server/catalog";
+import { getActiveBumps, getMainProduct } from "@/server/catalog";
 import { getSettings, isOn, settingInt } from "@/server/settings";
 import { CheckoutClient } from "./CheckoutClient";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Finalizar pedido", robots: { index: 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ oferta?: string }> }) {
-  const [{ oferta }, product, s] = await Promise.all([searchParams, getMainProduct(), getSettings()]);
+  const [{ oferta }, product, s, bumps] = await Promise.all([searchParams, getMainProduct(), getSettings(), getActiveBumps().catch(() => [])]);
   if (!product?.offers.length) {
     return (
       <div className="container-page max-w-lg py-20 text-center">
@@ -29,6 +29,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       imageUrl={product.mainImage?.url ?? null}
       volume={product.specs.find((x) => /conte|volume/i.test(x.label))?.value ?? null}
       offers={product.offers}
+      bumps={bumps}
       initialOfferId={initial.id}
       shippingCents={Math.max(0, settingInt(s, "shipping_flat_cents", 0))}
       shippingLabel={s.shipping_label}

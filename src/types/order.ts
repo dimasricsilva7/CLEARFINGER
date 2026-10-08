@@ -16,5 +16,5 @@ export type PublicOrder = {
   trackingCode: string | null;
   pixError: boolean;
   crediario: { installments: number; installmentLabel: string; methodLabel: string } | null;
-  items: { name: string; offerName: string; quantity: number; units: number; unitPriceCents: number; totalPriceCents: number }[];
+  items: { name: string; offerName: string; kind: "OFFER" | "ORDER_BUMP"; quantity: number; units: number; unitPriceCents: number; totalPriceCents: number }[];
 };

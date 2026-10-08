@@ -195,3 +195,55 @@ export async function deleteOffer(_: ActionResult, fd: FormData): Promise<Action
     return { ok: true, message: "Oferta removida." };
   });
 }
+
+// ───────────── Order bumps ─────────────
+
+export async function saveBump(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("ADMIN", async (admin) => {
+    const id = optStr(fd, "id", 40);
+    const productId = str(fd, "productId", 40);
+    const priceCents = parseMoney(fd.get("price"));
+    const compare = parseMoney(fd.get("compareAtPrice"));
+    if (!(await db.product.findUnique({ where: { id: productId }, select: { id: true } }))) return { error: "Escolha o produto do order bump." };
+    if (priceCents == null || priceCents <= 0) return { error: "Informe um preço válido." };
+    const data = {
+      productId,
+      name: str(fd, "name", 80) || str(fd, "title", 80),
+      title: str(fd, "title", 120),
+      description: optStr(fd, "description", 300),
+      quantity: Math.max(1, Math.min(20, int(fd, "quantity", 1))),
+      priceCents,
+      compareAtPriceCents: compare && compare > priceCents ? compare : null,
+      imageUrl: url(fd, "imageUrl"),
+      badge: optStr(fd, "badge", 40),
+      sortOrder: int(fd, "sortOrder", 0),
+      active: bool(fd, "active"),
+    };
+    if (!data.title) return { error: "Informe o título exibido no checkout." };
+    if (id) {
+      const before = await db.orderBump.findUniqueOrThrow({ where: { id } });
+      const after = await db.orderBump.update({ where: { id }, data });
+      await audit(admin.id, "bump_updated", "orderBump", id, { summary: `Order bump "${after.title}" atualizado`, before: asRecord(before), after: asRecord(after) });
+    } else {
+      const created = await db.orderBump.create({ data });
+      await audit(admin.id, "bump_created", "orderBump", created.id, { summary: `Order bump criado: ${created.title}` });
+    }
+    revalidatePath("/admin/order-bumps");
+    return { ok: true, message: "Order bump salvo. O checkout já mostra a nova versão." };
+  });
+}
+
+export async function deleteBump(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("ADMIN", async (admin) => {
+    const id = str(fd, "id", 40);
+    if (await db.orderItem.count({ where: { bumpId: id } })) {
+      await db.orderBump.update({ where: { id }, data: { active: false } });
+      revalidatePath("/admin/order-bumps");
+      return { ok: true, message: "O order bump já foi vendido e foi apenas desativado (histórico preservado)." };
+    }
+    const b = await db.orderBump.delete({ where: { id } });
+    await audit(admin.id, "bump_deleted", "orderBump", id, { summary: `Order bump removido: ${b.title}` });
+    revalidatePath("/admin/order-bumps");
+    return { ok: true, message: "Removido." };
+  });
+}

@@ -76,6 +76,7 @@ export const checkoutSchema = z.object({
   checkoutToken: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/),
   offerId: idSchema,
   quantity: z.number().int().min(1).max(5).default(1),
+  bumpIds: z.array(idSchema).max(5).default([]),
   paymentMethod: z.enum(["PIX", "CREDIARIO"]),
   customer: customerSchema,
   address: addressSchema,

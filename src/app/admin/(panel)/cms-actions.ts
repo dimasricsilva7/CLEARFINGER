@@ -22,6 +22,9 @@ const iconItems = (fd: FormData, k: string) =>
 /** Campos específicos de cada tipo de seção → `config`. */
 function parseConfig(type: string, fd: FormData, prev: Record<string, unknown>): Record<string, unknown> {
   const c: Record<string, unknown> = { ...prev };
+  const tone = str(fd, "cfg_tone", 10);
+  c.tone = ["white", "mist", "navy"].includes(tone) ? tone : "auto";
+  if (type !== "hero") c.eyebrow = str(fd, "cfg_eyebrow", 60);
   switch (type) {
     case "hero":
       c.eyebrow = str(fd, "cfg_eyebrow", 90);

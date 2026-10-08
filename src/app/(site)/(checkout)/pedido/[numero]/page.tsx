@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { crediarioConfig } from "@/lib/crediario";
 import { findOrderByAccess, toPublicOrder } from "@/server/orders";
 import { getSettings } from "@/server/settings";
+import { getMainProduct } from "@/server/catalog";
 import { whatsappLink } from "@/components/layout/Footer";
 import { OrderClient } from "./OrderClient";
 
@@ -24,11 +25,11 @@ export default async function OrderPage({ params, searchParams }: Props) {
       </div>
     );
   }
-  const s = await getSettings();
+  const [s, product] = await Promise.all([getSettings(), getMainProduct()]);
   const pub = toPublicOrder(order);
   const qrSvg = pub.pixCopyPaste ? await QRCode.toString(pub.pixCopyPaste, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#0B2545", light: "#FFFFFF" } }) : null;
   const wa = s.whatsapp ? whatsappLink(s.whatsapp, `Olá! Tenho uma dúvida sobre o pedido ${pub.orderNumber}.`) : null;
   const cfg = crediarioConfig(s);
 
-  return <OrderClient initial={pub} token={t!} qrSvg={qrSvg} whatsappUrl={wa} storeName={s.store_name} crediarioTexts={{ successTitle: cfg.successTitle, successMessage: cfg.successMessage, infoMessage: cfg.infoMessage }} />;
+  return <OrderClient initial={pub} token={t!} qrSvg={qrSvg} whatsappUrl={wa} storeName={s.store_name} crediarioTexts={{ successTitle: cfg.successTitle, successMessage: cfg.successMessage, infoMessage: cfg.infoMessage }} imageUrl={product?.mainImage?.url ?? null} />;
 }

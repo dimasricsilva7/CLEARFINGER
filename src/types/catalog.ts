@@ -36,3 +36,15 @@ export type PublicProduct = {
   gallery: PublicImage[];
   offers: PublicOffer[];
 };
+
+export type PublicBump = {
+  id: string;
+  title: string;
+  description: string | null;
+  quantity: number;
+  priceCents: number;
+  compareAtPriceCents: number | null;
+  imageUrl: string | null;
+  badge: string | null;
+  productName: string;
+};

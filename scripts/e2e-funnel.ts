@@ -67,10 +67,13 @@ async function run() {
   await page.waitForTimeout(800);
   await Promise.all([page.waitForURL(/\/checkout\?oferta=kit-2/), page.locator('[data-cta="offer_kit-2"]').click()]);
   await fillCustomer(page, `pix${Date.now()}`);
+  await page.locator('[data-cta^="order_bump_"]').first().click();
   await page.locator('[data-cta="method_pix"]').click();
   await Promise.all([page.waitForURL(/\/pedido\//, { timeout: 90000 }), page.locator('[data-cta="checkout_submit"]').first().click()]);
   const pixUrl = page.url();
-  ok(await page.getByText("Pague com PIX para concluir").isVisible(), "PIX: página do pedido com código");
+  ok(await page.locator('[data-cta="pix_copy"]').isVisible(), "PIX: página do pedido com código");
+  ok((await page.content()).includes("Adicione +1 frasco") && (await page.content()).includes("139,80"), "order bump: incluído no pedido e no total (R$ 139,80)");
+  await page.getByRole("button", { name: /Mostrar QR Code/ }).click();
   ok(await page.locator('[aria-label="QR Code do PIX"]').isVisible(), "PIX: QR Code exibido");
   await page.locator('[data-cta="pix_copy"]').click();
   const pixOrder = decodeURIComponent(pixUrl.split("/pedido/")[1].split("?")[0]);
@@ -126,7 +129,7 @@ async function run() {
 
   // Página do cliente mostra confirmação
   await page.goto(pixUrl);
-  ok(await page.getByText("Pagamento confirmado").isVisible(), "PIX: cliente vê pagamento confirmado (Purchase)");
+  ok(await page.getByRole("heading", { name: /Pagamento confirmado/ }).isVisible(), "PIX: cliente vê pagamento confirmado (Purchase)");
 
   // Crediário: dados mascarados + aprovação
   await admin.goto(`${BASE}/admin/pedidos?metodo=CREDIARIO&q=${credOrder}`);
@@ -166,7 +169,7 @@ async function run() {
   await admin.getByText(/Oferta salva/).first().waitFor({ timeout: 60000 });
 
   // Todas as páginas do admin
-  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
+  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
     const res = await admin.goto(`${BASE}${path}`);
     const txt = await admin.locator("main").innerText().catch(() => "");
     ok(res?.status() === 200 && !/Application error|Unhandled Runtime Error/.test(txt), `admin ${path}`);

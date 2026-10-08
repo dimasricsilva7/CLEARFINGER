@@ -1,4 +1,4 @@
-import { LandingSection, type LandingCtx } from "@/components/landing/Sections";
+import { LandingSection, assignTones, isVisible, type LandingCtx } from "@/components/landing/Sections";
 import { ScrollDepth } from "@/components/landing/client";
 import { StickyCta } from "@/components/layout/StickyCta";
 import { crediarioConfig, installmentOptions } from "@/lib/crediario";
@@ -26,10 +26,13 @@ export default async function Home() {
   };
   const ctx: LandingCtx = { product, faqs, testimonials, crediarioHint, pixLabel: isOn(s.pix_enabled) ? s.pix_method_label || "PIX" : null };
 
+  const visible = sections.filter((x) => isVisible(x, ctx));
+  const tones = assignTones(visible);
+
   return (
     <>
-      {sections.filter((x) => x.active).map((x) => (
-        <LandingSection key={x.key} s={x} ctx={ctx} />
+      {visible.map((x, i) => (
+        <LandingSection key={x.key} s={x} ctx={ctx} tone={tones[i]} />
       ))}
       <ScrollDepth />
       {isOn(s.sticky_cta_enabled) && <StickyCta label={s.sticky_cta_label || "Comprar"} priceText={null} />}

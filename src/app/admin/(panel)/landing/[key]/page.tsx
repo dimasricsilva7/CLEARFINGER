@@ -15,7 +15,7 @@ const s = (v: unknown) => (typeof v === "string" ? v : "");
 /** Quais campos comuns cada tipo de seção usa (evita campos que não aparecem no site). */
 const USES: Record<string, { subtitle?: boolean; body?: boolean; image?: string; video?: boolean; cta?: boolean }> = {
   hero: { subtitle: true, image: "Imagem do produto (vazio = imagem principal do produto)", cta: true },
-  pain: { subtitle: true, body: true },
+  pain: { subtitle: true, body: true, image: "Foto da seção (pessoa/mãos — use fotos com licença de uso)" },
   solution: { body: true, image: "Imagem (vazio = imagem secundária/principal do produto)", cta: true },
   how_it_works: { subtitle: true },
   demo: { subtitle: true, image: "Imagem única de demonstração (opcional)", video: true },
@@ -48,7 +48,15 @@ export default async function EditSectionPage({ params }: { params: Promise<{ ke
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex items-center gap-2 text-sm font-medium md:col-span-2"><input type="checkbox" name="active" defaultChecked={section.active} className="h-4 w-4" /> Seção visível na landing</label>
             <Field label="Nome interno"><input name="label" defaultValue={section.label} className={inputCls} /></Field>
-            <div />
+            <Field label="Fundo da seção" hint="Automático alterna as cores para separar bem as seções">
+              <select name="cfg_tone" defaultValue={s(c.tone) || "auto"} className={inputCls}>
+                <option value="auto">Automático</option>
+                <option value="white">Branco</option>
+                <option value="mist">Cinza-azulado claro</option>
+                <option value="navy">Azul-marinho</option>
+              </select>
+            </Field>
+            {t !== "hero" && <Field label="Texto pequeno acima do título" className="md:col-span-2" hint="Vazio = padrão da seção"><input name="cfg_eyebrow" defaultValue={s(c.eyebrow)} className={inputCls} /></Field>}
             <Field label={t === "hero" ? "Headline" : "Título"} className="md:col-span-2"><input name="title" defaultValue={section.title ?? ""} className={inputCls} /></Field>
             {use.subtitle && <Field label={t === "hero" ? "Subheadline" : "Subtítulo"} className="md:col-span-2"><textarea name="subtitle" rows={2} defaultValue={section.subtitle ?? ""} className={textareaCls} /></Field>}
             {use.body && <Field label="Texto" className="md:col-span-2" hint="Parágrafos separados por uma linha em branco."><textarea name="body" rows={6} defaultValue={section.body ?? ""} className={textareaCls} /></Field>}

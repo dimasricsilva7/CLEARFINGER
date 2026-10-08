@@ -115,8 +115,15 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
   const quantity = Math.min(5, Math.max(1, input.quantity));
   if (offer.product.stockQuantity != null && offer.product.stockQuantity < offer.quantity * quantity) throw new CheckoutError("Quantidade indisponível no estoque.", 409);
 
+  // Order bumps escolhidos no checkout — preço e disponibilidade sempre do banco
+  const bumpIds = [...new Set(input.bumpIds ?? [])];
+  const bumps = bumpIds.length
+    ? await db.orderBump.findMany({ where: { id: { in: bumpIds }, active: true, priceCents: { gt: 0 }, product: { active: true } }, include: { product: true } })
+    : [];
+  if (bumps.length !== bumpIds.length) throw new CheckoutError("Uma das ofertas adicionais não está mais disponível. Revise o pedido.", 409);
+
   const shippingCents = Math.max(0, settingInt(settings, "shipping_flat_cents", 0));
-  const totals = computeTotals([{ unitPriceCents: offer.priceCents, quantity }], shippingCents);
+  const totals = computeTotals([{ unitPriceCents: offer.priceCents, quantity }, ...bumps.map((b) => ({ unitPriceCents: b.priceCents, quantity: 1 }))], shippingCents);
   if (method === "PIX" && totals.totalCents < MIN_PIX_CENTS) throw new CheckoutError("O valor mínimo para pagamento via PIX é R$ 5,00.");
   if (isOn(settings.require_cpf) && !input.customer.cpf) throw new CheckoutError("Confira os dados informados.", 422, { "customer.cpf": "Informe seu CPF" });
 
@@ -172,18 +179,34 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
           ipHash: hashIp(meta.ip),
           ...attr,
           items: {
-            create: {
-              productId: offer.productId,
-              offerId: offer.id,
-              productName: offer.product.name,
-              offerName: offer.name,
-              sku: offer.product.sku,
-              unitsPerOffer: offer.quantity,
-              quantity,
-              unitPriceCents: offer.priceCents,
-              listPriceCents: offer.compareAtPriceCents ?? offer.priceCents,
-              totalPriceCents: offer.priceCents * quantity,
-            },
+            create: [
+              {
+                kind: "OFFER" as const,
+                productId: offer.productId,
+                offerId: offer.id,
+                productName: offer.product.name,
+                offerName: offer.name,
+                sku: offer.product.sku,
+                unitsPerOffer: offer.quantity,
+                quantity,
+                unitPriceCents: offer.priceCents,
+                listPriceCents: offer.compareAtPriceCents ?? offer.priceCents,
+                totalPriceCents: offer.priceCents * quantity,
+              },
+              ...bumps.map((b) => ({
+                kind: "ORDER_BUMP" as const,
+                bumpId: b.id,
+                productId: b.productId,
+                productName: b.product.name,
+                offerName: b.title,
+                sku: b.product.sku,
+                unitsPerOffer: b.quantity,
+                quantity: 1,
+                unitPriceCents: b.priceCents,
+                listPriceCents: b.compareAtPriceCents ?? b.priceCents,
+                totalPriceCents: b.priceCents,
+              })),
+            ],
           },
           utm: {
             create: {
@@ -219,6 +242,7 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
   await logOrderEvent(order.id, "order_created", `Pedido ${order.orderNumber} criado (${method === "PIX" ? "PIX" : cfg.methodLabel})`, {
     total: order.totalCents,
     offer: `${quantity}x ${offer.name}`,
+    bumps: bumps.map((b) => b.title),
     installments: crediarioRow?.installments,
   });
   log.info("checkout", "pedido criado", { order: order.orderNumber, method, total: order.totalCents, channel: order.channel });
@@ -623,6 +647,6 @@ export function toPublicOrder(o: AccessOrder): PublicOrder {
     trackingCode: o.trackingCode,
     pixError: awaiting && !o.pixCopyPaste && Boolean(o.paymentError),
     crediario: o.crediario ? { installments: o.crediario.installments, installmentLabel: o.crediario.installmentLabel, methodLabel: o.crediario.methodLabel } : null,
-    items: o.items.map((i) => ({ name: i.productName, offerName: i.offerName, quantity: i.quantity, units: i.unitsPerOffer, unitPriceCents: i.unitPriceCents, totalPriceCents: i.totalPriceCents })),
+    items: o.items.map((i) => ({ name: i.productName, offerName: i.offerName, kind: i.kind, quantity: i.quantity, units: i.unitsPerOffer, unitPriceCents: i.unitPriceCents, totalPriceCents: i.totalPriceCents })),
   };
 }

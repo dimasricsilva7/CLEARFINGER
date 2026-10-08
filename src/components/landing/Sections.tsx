@@ -1,12 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Faq, Testimonial } from "@prisma/client";
 import { Icon } from "@/components/ui/Icon";
+import { ProductStack, Stage } from "@/components/ui/ProductStage";
 import { cfgArr, cfgStr, type SectionData } from "@/server/landing";
 import { offerDiscountLabel } from "@/lib/pricing";
 import { formatBRL } from "@/utils/format";
 import type { IconItem } from "@/lib/domain";
 import type { PublicProduct } from "@/types/catalog";
 import { DemoVideo, FaqItem, OfferLink, ViewTracker } from "./client";
+
+export type Tone = "white" | "mist" | "navy";
 
 export type LandingCtx = {
   product: PublicProduct | null;
@@ -17,79 +20,75 @@ export type LandingCtx = {
   pixLabel: string | null;
 };
 
-const paragraphs = (body: string | null) => (body ?? "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+type P = { s: SectionData; ctx: LandingCtx; tone: Tone };
 
-function Heading({ s, center = false, light = false }: { s: SectionData; center?: boolean; light?: boolean }) {
-  const eyebrow = cfgStr(s.config, "eyebrow");
+const paragraphs = (body: string | null) => (body ?? "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const BG: Record<Tone, string> = {
+  white: "bg-surface",
+  mist: "bg-mist/70",
+  navy: "bg-navy text-white",
+};
+const dark = (t: Tone) => t === "navy";
+
+function Heading({ s, tone, center = false, eyebrow }: { s: SectionData; tone: Tone; center?: boolean; eyebrow?: string }) {
+  const eb = cfgStr(s.config, "eyebrow") || eyebrow;
   return (
     <div className={center ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
-      {eyebrow && <p className={`eyebrow ${light ? "text-sky-300" : ""}`}>{eyebrow}</p>}
-      {s.title && <h2 className={`h-section mt-2 ${light ? "text-white" : ""}`}>{s.title}</h2>}
-      {s.subtitle && <p className={`lead mt-3 ${light ? "text-white/75" : ""}`}>{s.subtitle}</p>}
+      {eb && <p className={`eyebrow ${dark(tone) ? "!text-sky-300" : ""}`}>{eb}</p>}
+      {s.title && <h2 className={`h-section ${eb ? "mt-3" : ""} ${dark(tone) ? "!text-white" : ""}`}>{s.title}</h2>}
+      {s.subtitle && <p className={`lead mt-4 ${dark(tone) ? "!text-white/70" : ""}`}>{s.subtitle}</p>}
     </div>
   );
 }
 
+const productImg = (ctx: LandingCtx) => ctx.product?.mainImage?.url ?? null;
+const productAlt = (ctx: LandingCtx) => ctx.product?.mainImage?.alt ?? ctx.product?.name ?? "CLEARFINGER";
+
 // ───────────── Primeira tela ─────────────
 
-function Hero({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+function Hero({ s, ctx }: P) {
   const p = ctx.product;
   const offers = p?.offers ?? [];
   const entry = offers.length ? offers.reduce((a, b) => (b.priceCents < a.priceCents ? b : a)) : null;
-  const img = s.imageUrl || p?.mainImage?.url || null;
+  const img = s.imageUrl || productImg(ctx);
   const badges = cfgArr<string>(s.config, "badges").filter(Boolean).slice(0, 4);
   const hint = entry ? ctx.crediarioHint(entry.priceCents) : null;
+  const eyebrow = cfgStr(s.config, "eyebrow");
+  const meta = p ? { name: "ViewContent", params: { content_ids: [p.sku], content_name: p.name, content_type: "product", value: (entry?.priceCents ?? p.priceCents) / 100, currency: "BRL" } } : null;
   return (
     <section className="relative overflow-hidden bg-surface">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(70%_60%_at_85%_20%,rgb(var(--c-primary)/0.10),transparent)]" aria-hidden="true" />
-      <div className="container-page relative grid items-center gap-6 pb-10 pt-6 sm:pt-10 md:grid-cols-[1.05fr_1fr] md:gap-10 md:pb-16 lg:pt-14">
-        <div>
-          {cfgStr(s.config, "eyebrow") && <p className="eyebrow">{cfgStr(s.config, "eyebrow")}</p>}
-          <h1 className="mt-2 font-display text-[1.85rem] font-bold leading-[1.08] text-navy sm:text-5xl lg:text-[3.35rem]">{s.title}</h1>
-          {s.subtitle && <p className="mt-3 max-w-xl text-base leading-relaxed text-muted sm:mt-4 sm:text-lg">{s.subtitle}</p>}
-
-          {/* Produto aparece já na primeira dobra no celular */}
-          {img && (
-            <ViewTracker
-              id="hero-product-m"
-              event="product_view"
-              productId={p?.id}
-              valueCents={entry?.priceCents}
-              meta={p ? { name: "ViewContent", params: { content_ids: [p.sku], content_name: p.name, content_type: "product", value: (entry?.priceCents ?? p.priceCents) / 100, currency: "BRL" } } : null}
-              className="relative mt-5 md:hidden"
-            >
-              <div className="mx-auto flex max-w-[22rem] items-center justify-center rounded-card bg-mist/70 p-3">
-                <img src={img} alt={p?.mainImage?.alt ?? p?.name ?? "CLEARFINGER"} className="h-auto max-h-[13.5rem] w-auto object-contain mix-blend-multiply" width={1200} height={1096} fetchPriority="high" />
-              </div>
-            </ViewTracker>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_90%_10%,rgb(var(--c-primary)/0.10),transparent_70%),linear-gradient(180deg,#fff_0%,rgb(var(--c-mist)/0.6)_100%)]" aria-hidden="true" />
+      <div className="container-page relative grid items-center gap-2 pb-10 pt-4 sm:pt-10 md:grid-cols-[1.05fr_1fr] md:gap-12 md:pb-20 lg:pt-16">
+        <div className="order-2 md:order-1">
+          {eyebrow && (
+            <p className="hidden items-center gap-2 rounded-full border border-primary/15 bg-surface/80 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-primary md:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              {eyebrow}
+            </p>
           )}
+          <h1 className="font-display text-[2rem] font-semibold leading-[1.07] tracking-[-0.02em] text-navy sm:text-5xl md:mt-5 lg:text-[3.5rem]">{s.title}</h1>
+          {s.subtitle && <p className="mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">{s.subtitle}</p>}
 
           {entry && (
-            <div className="mt-5 flex flex-wrap items-end gap-x-4 gap-y-1">
+            <div className="mt-6 flex items-end justify-between gap-4 rounded-2xl border border-line bg-surface/90 p-4 shadow-soft md:max-w-md">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted">{offers.length > 1 ? "A partir de" : "Por"}</p>
-                <p className="font-display text-[2rem] font-bold leading-none text-navy">
-                  {formatBRL(entry.priceCents)}
-                  {entry.compareAtPriceCents && <s className="ml-2 align-middle text-base font-medium text-muted">{formatBRL(entry.compareAtPriceCents)}</s>}
-                </p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{offers.length > 1 ? "A partir de" : "Por"}</p>
+                <p className="font-display text-[2rem] font-semibold leading-none tracking-tight text-navy">{formatBRL(entry.priceCents)}</p>
+                {hint && <p className="mt-1.5 text-[13px] text-muted">{hint}</p>}
               </div>
-              {hint && <p className="pb-1 text-sm font-medium text-muted">{hint}</p>}
+              {ctx.pixLabel && <span className="shrink-0 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-bold text-success">{ctx.pixLabel} na hora</span>}
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <a id="hero-cta" href={s.ctaTarget || "#ofertas"} data-cta="hero_cta" className="btn-primary w-full sm:w-auto sm:px-8">
-              {s.ctaLabel || "Comprar"}
-            </a>
-            <a href="#como-funciona" data-cta="hero_secondary" className="btn-ghost hidden sm:inline-flex">
-              Como funciona
-            </a>
-          </div>
+          <a id="hero-cta" href={s.ctaTarget || "#ofertas"} data-cta="hero_cta" className="btn-primary mt-4 w-full md:w-auto md:px-10">
+            {s.ctaLabel || "Comprar"}
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </a>
           {badges.length > 0 && (
-            <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[13px] font-semibold text-navy/80">
+            <ul className="mt-5 grid grid-cols-3 gap-2 md:flex md:flex-wrap md:gap-x-6">
               {badges.map((b, i) => (
-                <li key={b} className="flex items-center gap-1.5">
-                  <Icon name={["lock", "pix", "shield", "truck"][i] ?? "check"} className="h-4 w-4 text-primary" strokeWidth={2} />
+                <li key={b} className="flex flex-col items-center gap-1 rounded-xl bg-surface/80 px-1 py-2.5 text-center text-[11px] font-semibold leading-tight text-navy/80 ring-1 ring-line md:flex-row md:bg-transparent md:p-0 md:text-[13px] md:ring-0">
+                  <Icon name={["lock", "pix", "shield", "truck"][i] ?? "check"} className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} />
                   {b}
                 </li>
               ))}
@@ -98,17 +97,11 @@ function Hero({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
         </div>
 
         {img && (
-          <ViewTracker
-            id="hero-product"
-            event="product_view"
-            productId={p?.id}
-            valueCents={entry?.priceCents}
-            meta={p ? { name: "ViewContent", params: { content_ids: [p.sku], content_name: p.name, content_type: "product", value: (entry?.priceCents ?? p.priceCents) / 100, currency: "BRL" } } : null}
-            className="hidden md:block"
-          >
-            <div className="relative mx-auto max-w-[34rem] rounded-[2rem] bg-gradient-to-b from-mist to-surface p-6 lg:p-8">
-              <img src={img} alt={p?.mainImage?.alt ?? p?.name ?? "CLEARFINGER"} className="h-auto w-full object-contain mix-blend-multiply" width={1200} height={1096} fetchPriority="high" />
-            </div>
+          <ViewTracker id="hero-product" event="product_view" productId={p?.id} valueCents={entry?.priceCents} meta={meta} className="order-1 md:order-2">
+            {eyebrow && <p className="mb-1 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-primary md:hidden">{eyebrow}</p>}
+            <Stage className="mx-auto aspect-[1/0.9] w-full max-w-[21rem] md:max-w-[34rem]">
+              <ProductStack src={img} alt={productAlt(ctx)} className="absolute inset-x-0 bottom-[6%] top-[4%]" priority />
+            </Stage>
           </ViewTracker>
         )}
       </div>
@@ -118,25 +111,36 @@ function Hero({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── Dor / identificação ─────────────
 
-function Pain({ s }: { s: SectionData }) {
+function Pain({ s, tone }: P) {
   const items = cfgArr<string>(s.config, "items").filter(Boolean);
+  const d = dark(tone);
   return (
-    <section className="section bg-mist/60">
-      <div className="container-page grid gap-8 md:grid-cols-2 md:gap-14">
-        <div>
-          <h2 className="h-section">{s.title}</h2>
-          {s.subtitle && <p className="lead mt-3">{s.subtitle}</p>}
+    <section className={`relative overflow-hidden ${BG[tone]}`}>
+      {s.imageUrl && (
+        <div className="relative md:absolute md:inset-y-0 md:left-0 md:w-[46%]">
+          <img src={s.imageUrl} alt="" className="h-64 w-full object-cover sm:h-80 md:h-full" loading="lazy" />
+          <div aria-hidden="true" className={`absolute inset-0 ${d ? "bg-gradient-to-t from-navy via-navy/25 to-transparent md:bg-gradient-to-l md:from-navy md:via-navy/10" : "bg-gradient-to-t from-surface via-surface/20 to-transparent md:bg-gradient-to-l md:from-surface"}`} />
         </div>
-        <div>
-          {paragraphs(s.body).map((p, i) => (
-            <p key={i} className={`text-[1.0625rem] leading-relaxed ${i === 0 ? "font-medium text-navy" : "mt-4 text-muted"}`}>
-              {p}
-            </p>
-          ))}
+      )}
+      <div className={`container-page relative grid ${s.imageUrl ? "md:grid-cols-[46%_1fr]" : ""}`}>
+        {s.imageUrl && <div className="hidden md:block" />}
+        <div className={s.imageUrl ? "-mt-14 pb-14 md:mt-0 md:py-24 md:pl-14" : "section"}>
+          <h2 className={`h-section ${d ? "!text-white" : ""}`}>{s.title}</h2>
+          {s.subtitle && <p className={`lead mt-3 ${d ? "!text-white/70" : ""}`}>{s.subtitle}</p>}
+          <div className="mt-5 space-y-4">
+            {paragraphs(s.body).map((p, i) => (
+              <p key={i} className={`text-[1.0625rem] leading-relaxed ${i === 0 ? (d ? "font-medium text-white" : "font-medium text-navy") : d ? "text-white/70" : "text-muted"}`}>
+                {p}
+              </p>
+            ))}
+          </div>
           {items.length > 0 && (
-            <ul className="mt-6 space-y-3 border-l-2 border-primary/40 pl-5">
+            <ul className="mt-7 space-y-2.5">
               {items.map((it) => (
-                <li key={it} className="text-[15px] text-navy">{it}</li>
+                <li key={it} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-[15px] ${d ? "bg-white/[0.06] text-white/90 ring-1 ring-white/10" : "bg-mist/60 text-navy"}`}>
+                  <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${d ? "bg-amber-300" : "bg-amber-500"}`} aria-hidden="true" />
+                  {it}
+                </li>
               ))}
             </ul>
           )}
@@ -148,29 +152,30 @@ function Pain({ s }: { s: SectionData }) {
 
 // ───────────── Solução ─────────────
 
-function Solution({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+function Solution({ s, ctx, tone }: P) {
   const points = cfgArr<string>(s.config, "points").filter(Boolean);
-  const img = s.imageUrl || ctx.product?.secondaryImage?.url || ctx.product?.mainImage?.url;
-  const sameAsHero = img === ctx.product?.mainImage?.url;
+  const img = s.imageUrl || ctx.product?.secondaryImage?.url || productImg(ctx);
+  const d = dark(tone);
   return (
-    <section className="section bg-surface">
-      <div className="container-page grid items-center gap-10 md:grid-cols-2 md:gap-14">
+    <section className={`section ${BG[tone]}`}>
+      <div className="container-page grid items-center gap-8 md:grid-cols-2 md:gap-16">
         {img && (
-          <div className={`order-2 rounded-[2rem] bg-mist/70 p-5 md:order-1 md:block md:p-8 ${sameAsHero ? "hidden" : ""}`}>
-            <img src={img} alt={ctx.product?.name ?? ""} className="mx-auto h-auto max-h-[26rem] w-auto object-contain mix-blend-multiply" loading="lazy" width={1200} height={1096} />
-          </div>
+          <Stage className="mx-auto aspect-square w-full max-w-[22rem] md:max-w-[30rem]">
+            <ProductStack src={img} alt={productAlt(ctx)} className="absolute inset-x-0 bottom-[8%] top-[6%]" />
+          </Stage>
         )}
-        <div className="order-1 md:order-2">
-          <h2 className="h-section">{s.title}</h2>
+        <div className="md:order-first">
+          <p className={`eyebrow ${d ? "!text-sky-300" : ""}`}>{cfgStr(s.config, "eyebrow") || "A solução"}</p>
+          <h2 className={`h-section mt-3 ${d ? "!text-white" : ""}`}>{s.title}</h2>
           {paragraphs(s.body).map((p, i) => (
-            <p key={i} className="lead mt-4">{p}</p>
+            <p key={i} className={`lead mt-4 ${d ? "!text-white/70" : ""}`}>{p}</p>
           ))}
           {points.length > 0 && (
-            <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+            <ul className="mt-6 grid grid-cols-2 gap-2.5">
               {points.map((pt) => (
-                <li key={pt} className="flex items-start gap-2.5 text-[15px] font-semibold text-navy">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                    <Icon name="check" className="h-3.5 w-3.5" strokeWidth={2.5} />
+                <li key={pt} className={`flex items-start gap-2 rounded-xl p-3 text-[14px] font-semibold leading-snug ${d ? "bg-white/[0.06] text-white" : "bg-mist/70 text-navy"}`}>
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-white">
+                    <Icon name="check" className="h-3 w-3" strokeWidth={3} />
                   </span>
                   {pt}
                 </li>
@@ -178,7 +183,7 @@ function Solution({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
             </ul>
           )}
           {s.ctaLabel && (
-            <a href={s.ctaTarget || "#ofertas"} data-cta="solution_cta" className="btn-navy mt-8 w-full sm:w-auto">
+            <a href={s.ctaTarget || "#ofertas"} data-cta="solution_cta" className={`${d ? "btn-primary" : "btn-navy"} mt-6 w-full sm:w-auto`}>
               {s.ctaLabel}
             </a>
           )}
@@ -190,23 +195,27 @@ function Solution({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── Como funciona ─────────────
 
-function HowItWorks({ s }: { s: SectionData }) {
+function HowItWorks({ s, tone }: P) {
   const steps = cfgArr<{ title: string; text?: string }>(s.config, "steps").filter((x) => x?.title);
   const note = cfgStr(s.config, "note");
+  const d = dark(tone);
   return (
-    <section id="como-funciona" className="section bg-navy text-white">
+    <section id="como-funciona" className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} light />
-        <ol className="mt-10 grid gap-px overflow-hidden rounded-card bg-white/10 md:grid-cols-3">
+        <Heading s={s} tone={tone} eyebrow="Passo a passo" />
+        <ol className="mt-10 grid gap-4 md:grid-cols-3 md:gap-6">
           {steps.map((st, i) => (
-            <li key={i} className="bg-navy p-6 sm:p-8">
-              <p className="font-display text-sm font-semibold tracking-[0.2em] text-sky-300">{String(i + 1).padStart(2, "0")}</p>
-              <p className="mt-3 font-display text-2xl font-semibold uppercase tracking-wide">{st.title}</p>
-              {st.text && <p className="mt-3 leading-relaxed text-white/75">{st.text}</p>}
+            <li key={i} className={`relative overflow-hidden rounded-card p-6 sm:p-7 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : "bg-surface shadow-soft ring-1 ring-line"}`}>
+              <span aria-hidden="true" className={`absolute -right-1 -top-5 font-display text-[6.5rem] font-bold leading-none ${d ? "text-white/[0.06]" : "text-primary/[0.07]"}`}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-primary font-display text-sm font-semibold text-white">{String(i + 1).padStart(2, "0")}</span>
+              <p className={`mt-5 font-display text-xl font-semibold uppercase tracking-[0.08em] ${d ? "text-white" : "text-navy"}`}>{st.title}</p>
+              {st.text && <p className={`mt-2 leading-relaxed ${d ? "text-white/70" : "text-muted"}`}>{st.text}</p>}
             </li>
           ))}
         </ol>
-        {note && <p className="mt-5 text-sm text-white/60">{note}</p>}
+        {note && <p className={`mt-5 text-sm ${d ? "text-white/60" : "text-muted"}`}>{note}</p>}
       </div>
     </section>
   );
@@ -214,36 +223,38 @@ function HowItWorks({ s }: { s: SectionData }) {
 
 // ───────────── Demonstração ─────────────
 
-function Demo({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+export const hasDemo = (s: SectionData, ctx: Pick<LandingCtx, "product">) =>
+  Boolean(s.videoUrl || ctx.product?.videoUrl || s.imageUrl || cfgStr(s.config, "beforeUrl") || cfgStr(s.config, "applicationUrl") || cfgStr(s.config, "afterUrl"));
+
+function Demo({ s, ctx, tone }: P) {
   const video = s.videoUrl || ctx.product?.videoUrl || null;
   const steps = [
     { label: "Antes", url: cfgStr(s.config, "beforeUrl") },
     { label: "Aplicação", url: cfgStr(s.config, "applicationUrl") },
     { label: "Depois", url: cfgStr(s.config, "afterUrl") },
   ].filter((x) => x.url);
-  const single = s.imageUrl;
-  if (!video && !steps.length && !single) return null; // sem material real, a seção não aparece
+  if (!hasDemo(s, ctx)) return null; // sem material real, a seção não aparece
   const caption = cfgStr(s.config, "caption");
   return (
-    <section className="section bg-surface">
+    <section className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} center />
-        <div className={`mt-10 grid items-start gap-8 ${video && (steps.length || single) ? "md:grid-cols-[320px_1fr]" : ""}`}>
+        <Heading s={s} tone={tone} center />
+        <div className={`mt-10 grid items-start gap-8 ${video && (steps.length || s.imageUrl) ? "md:grid-cols-[320px_1fr]" : ""}`}>
           {video && <DemoVideo url={video} poster={cfgStr(s.config, "posterUrl")} label={s.title ?? "Demonstração"} />}
           {steps.length > 0 ? (
             <ol className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {steps.map((st) => (
-                <li key={st.label} className="overflow-hidden rounded-card border border-line bg-mist/50">
+                <li key={st.label} className="overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line">
                   <img src={st.url} alt={st.label} className="aspect-square w-full object-cover" loading="lazy" />
                   <p className="px-4 py-3 text-sm font-bold uppercase tracking-wider text-navy">{st.label}</p>
                 </li>
               ))}
             </ol>
           ) : (
-            single && <img src={single} alt={s.title ?? ""} className="mx-auto w-full max-w-2xl rounded-card" loading="lazy" />
+            s.imageUrl && <img src={s.imageUrl} alt={s.title ?? ""} className="mx-auto w-full max-w-2xl rounded-card" loading="lazy" />
           )}
         </div>
-        {caption && <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted">{caption}</p>}
+        {caption && <p className={`mx-auto mt-6 max-w-2xl text-center text-sm ${dark(tone) ? "text-white/60" : "text-muted"}`}>{caption}</p>}
       </div>
     </section>
   );
@@ -251,21 +262,22 @@ function Demo({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── Benefícios ─────────────
 
-function Benefits({ s }: { s: SectionData }) {
+function Benefits({ s, tone }: P) {
   const items = cfgArr<IconItem>(s.config, "items").filter((x) => x?.title);
+  const d = dark(tone);
   return (
-    <section className="section bg-mist/60">
+    <section className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} />
-        <ul className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        <Heading s={s} tone={tone} eyebrow="Benefícios" />
+        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
           {items.map((it, i) => (
-            <li key={i} className="flex gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-primary/25 bg-surface text-primary">
+            <li key={i} className={`flex gap-4 rounded-card p-5 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : tone === "mist" ? "bg-surface shadow-soft ring-1 ring-line" : "bg-mist/60"}`}>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-[#3B8CEB] text-white shadow-[0_8px_18px_-8px_rgb(var(--c-primary)/0.8)]">
                 <Icon name={it.icon ?? "check"} className="h-6 w-6" />
               </span>
               <div>
-                <p className="font-display text-[1.0625rem] font-semibold text-navy">{it.title}</p>
-                {it.text && <p className="mt-1 text-[15px] leading-relaxed text-muted">{it.text}</p>}
+                <p className={`font-display text-[1.0625rem] font-semibold ${d ? "text-white" : "text-navy"}`}>{it.title}</p>
+                {it.text && <p className={`mt-1 text-[15px] leading-relaxed ${d ? "text-white/70" : "text-muted"}`}>{it.text}</p>}
               </div>
             </li>
           ))}
@@ -277,27 +289,23 @@ function Benefits({ s }: { s: SectionData }) {
 
 // ───────────── Depoimentos (somente reais) ─────────────
 
-function Testimonials({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+function Testimonials({ s, ctx, tone }: P) {
   if (!ctx.testimonials.length) return null;
   return (
-    <section className="section bg-surface">
+    <section className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} />
+        <Heading s={s} tone={tone} />
         <ul className="no-scrollbar -mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
           {ctx.testimonials.map((t) => (
-            <li key={t.id} className="card flex w-[85%] shrink-0 snap-start flex-col p-6 md:w-auto">
-              <p className="flex gap-0.5 text-primary" aria-label={`Nota ${t.rating} de 5`}>
+            <li key={t.id} className="card flex w-[85%] shrink-0 snap-start flex-col p-6 text-ink md:w-auto">
+              <p className="flex gap-0.5 text-amber-500" aria-label={`Nota ${t.rating} de 5`}>
                 {Array.from({ length: 5 }, (_, i) => (
                   <Icon key={i} name="star" className={`h-4 w-4 ${i < t.rating ? "fill-current" : "opacity-30"}`} />
                 ))}
               </p>
-              <blockquote className="mt-3 flex-1 text-[15px] leading-relaxed text-ink">“{t.text}”</blockquote>
+              <blockquote className="mt-3 flex-1 text-[15px] leading-relaxed">“{t.text}”</blockquote>
               <div className="mt-5 flex items-center gap-3">
-                {t.avatarUrl ? (
-                  <img src={t.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" loading="lazy" />
-                ) : (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-mist font-bold text-navy">{t.name.charAt(0)}</span>
-                )}
+                {t.avatarUrl ? <img src={t.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" loading="lazy" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-mist font-bold text-navy">{t.name.charAt(0)}</span>}
                 <div>
                   <p className="text-sm font-bold text-navy">{t.name}</p>
                   {t.city && <p className="text-xs text-muted">{t.city}</p>}
@@ -313,51 +321,63 @@ function Testimonials({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── Ofertas ─────────────
 
-function Offers({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+function Offers({ s, ctx, tone }: P) {
   const p = ctx.product;
   if (!p?.offers.length) return null;
+  const d = dark(tone);
+  const volume = p.specs.find((x) => /conte|volume/i.test(x.label))?.value ?? null;
+  const base = p.offers.find((o) => o.quantity === 1)?.priceCents ?? null;
   return (
-    <section id="ofertas" className="section bg-mist/60">
-      <div className="container-page">
-        <Heading s={s} center />
-        <ul className={`mx-auto mt-10 grid max-w-5xl gap-4 sm:gap-5 ${p.offers.length >= 3 ? "md:grid-cols-3" : p.offers.length === 2 ? "md:grid-cols-2" : "max-w-md"}`}>
+    <section id="ofertas" className={`section relative overflow-hidden ${BG[tone]}`}>
+      {d && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_0%,rgb(var(--c-primary)/0.35),transparent_70%)]" />}
+      <div className="container-page relative">
+        <Heading s={s} tone={tone} center eyebrow="Kits e preços" />
+        <ul className={`mx-auto mt-10 grid max-w-5xl gap-5 ${p.offers.length >= 3 ? "md:grid-cols-3" : p.offers.length === 2 ? "md:grid-cols-2" : "max-w-md"} md:items-center`}>
           {p.offers.map((o) => {
             const disc = offerDiscountLabel(o);
             const hint = ctx.crediarioHint(o.priceCents);
+            const save = o.compareAtPriceCents ? o.compareAtPriceCents - o.priceCents : null;
+            const img = o.imageUrl || productImg(ctx);
             return (
-              <li key={o.id} className={`relative flex flex-col rounded-card bg-surface p-6 ${o.highlight ? "border-2 border-primary shadow-lift md:-mt-3 md:pb-9" : "border border-line shadow-soft"}`}>
+              <li key={o.id} className={`relative flex flex-col overflow-hidden rounded-[1.5rem] bg-surface text-ink ${o.highlight ? "order-first shadow-[0_30px_60px_-25px_rgba(0,0,0,0.55)] ring-2 ring-primary md:order-none md:scale-[1.04]" : "shadow-lift ring-1 ring-line"}`}>
                 <ViewTracker id={`offer-${o.id}`} event="offer_view" productId={p.id} offerId={o.id} valueCents={o.priceCents} />
-                {o.badge && <span className={`absolute -top-3 left-6 rounded-full px-3 py-1 text-xs font-bold ${o.highlight ? "bg-primary text-white" : "bg-navy text-white"}`}>{o.badge}</span>}
-                <div className="flex items-center gap-4">
-                  {(o.imageUrl || p.mainImage) && <img src={o.imageUrl || p.mainImage!.url} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-mist object-contain p-1 mix-blend-multiply" loading="lazy" />}
-                  <div>
-                    <p className="font-display text-lg font-semibold text-navy">{o.name}</p>
-                    <p className="text-sm text-muted">{o.quantity} {o.quantity === 1 ? "frasco" : "frascos"} de {p.specs.find((x) => /conte|volume/i.test(x.label))?.value ?? "30 mL"}</p>
+                {o.badge && <span className={`absolute inset-x-0 top-0 z-10 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white ${o.highlight ? "bg-primary" : "bg-navy"}`}>{o.badge}</span>}
+                <div className={`relative bg-gradient-to-b from-mist to-surface px-6 ${o.badge ? "pt-10" : "pt-6"}`}>
+                  {img && <ProductStack src={img} alt={`${p.name} — ${o.name}`} count={o.quantity} className="mx-auto aspect-[1/0.82] w-full max-w-[17rem]" />}
+                  {o.quantity > 1 && <span className="absolute bottom-1 left-5 z-10 grid h-11 w-11 place-items-center rounded-full bg-navy font-display text-base font-semibold text-white shadow-lift ring-4 ring-surface">×{o.quantity}</span>}
+                </div>
+                <div className="flex flex-1 flex-col p-6 pt-4">
+                  <p className="font-display text-xl font-semibold text-navy">{o.name}</p>
+                  <p className="text-sm text-muted">
+                    {o.quantity} {o.quantity === 1 ? "frasco" : "frascos"}
+                    {volume ? ` de ${volume}` : ""}
+                    {o.description ? ` · ${o.description}` : ""}
+                  </p>
+                  <div className="mt-4 flex items-end justify-between gap-3">
+                    <div>
+                      {o.compareAtPriceCents && <p className="text-sm text-muted line-through">{formatBRL(o.compareAtPriceCents)}</p>}
+                      <p className="font-display text-[2.1rem] font-semibold leading-none tracking-tight text-navy">{formatBRL(o.priceCents)}</p>
+                    </div>
+                    {disc && <span className="rounded-lg bg-success/10 px-2 py-1 text-sm font-bold text-success">{disc}</span>}
                   </div>
+                  <div className="mt-3 space-y-1 text-[13px]">
+                    {o.quantity > 1 && <p className="font-semibold text-primary">{formatBRL(o.unitPriceCents)} por frasco{base && base > o.unitPriceCents ? ` (em vez de ${formatBRL(base)})` : ""}</p>}
+                    {save != null && save > 0 && <p className="font-semibold text-success">Você economiza {formatBRL(save)}</p>}
+                    {(ctx.pixLabel || hint) && <p className="text-muted">{[ctx.pixLabel && `à vista no ${ctx.pixLabel}`, hint].filter(Boolean).join(" ")}</p>}
+                  </div>
+                  <OfferLink href={`/checkout?oferta=${o.slug}`} offerId={o.id} productId={p.id} valueCents={o.priceCents} cta={`offer_${o.slug}`} className={`${o.highlight ? "btn-primary" : "btn-navy"} mt-5 w-full`}>
+                    {s.ctaLabel || "Comprar"}
+                  </OfferLink>
                 </div>
-                <div className="mt-5 border-t border-line pt-5">
-                  {o.compareAtPriceCents && (
-                    <p className="text-sm text-muted">
-                      De <s>{formatBRL(o.compareAtPriceCents)}</s>
-                      {disc && <span className="ml-2 rounded-md bg-success/10 px-1.5 py-0.5 text-xs font-bold text-success">{disc}</span>}
-                    </p>
-                  )}
-                  <p className="mt-1 font-display text-[2rem] font-bold leading-none text-navy">{formatBRL(o.priceCents)}</p>
-                  {ctx.pixLabel && <p className="mt-1.5 text-sm text-muted">no {ctx.pixLabel}{hint ? ` ${hint}` : ""}</p>}
-                  {!ctx.pixLabel && hint && <p className="mt-1.5 text-sm text-muted">{hint}</p>}
-                  {o.quantity > 1 && <p className="mt-2 text-sm font-semibold text-primary">{formatBRL(o.unitPriceCents)} por frasco</p>}
-                </div>
-                {o.description && <p className="mt-4 text-[15px] text-muted">{o.description}</p>}
-                <OfferLink href={`/checkout?oferta=${o.slug}`} offerId={o.id} productId={p.id} valueCents={o.priceCents} cta={`offer_${o.slug}`} className={`${o.highlight ? "btn-primary" : "btn-navy"} mt-6 w-full`}>
-                  {s.ctaLabel || "Comprar"}
-                </OfferLink>
               </li>
             );
           })}
         </ul>
-        <p className="mt-6 flex items-center justify-center gap-2 text-center text-sm text-muted">
-          <Icon name="lock" className="h-4 w-4 text-primary" /> Pagamento protegido · seus dados não são compartilhados
-        </p>
+        <ul className={`mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] font-medium ${d ? "text-white/75" : "text-muted"}`}>
+          <li className="flex items-center gap-1.5"><Icon name="lock" className="h-4 w-4" /> Pagamento protegido</li>
+          {ctx.pixLabel && <li className="flex items-center gap-1.5"><Icon name="pix" className="h-4 w-4" /> {ctx.pixLabel} com confirmação automática</li>}
+          <li className="flex items-center gap-1.5"><Icon name="shield" className="h-4 w-4" /> Seus dados não são compartilhados</li>
+        </ul>
       </div>
     </section>
   );
@@ -365,13 +385,13 @@ function Offers({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── FAQ ─────────────
 
-function FaqSection({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+function FaqSection({ s, ctx, tone }: P) {
   if (!ctx.faqs.length) return null;
   return (
-    <section id="faq" className="section bg-surface">
+    <section id="faq" className={`section ${BG[tone]}`}>
       <div className="container-page grid gap-8 md:grid-cols-[1fr_1.6fr] md:gap-14">
-        <Heading s={s} />
-        <div className="space-y-3">
+        <Heading s={s} tone={tone} eyebrow="Dúvidas" />
+        <div className="space-y-3 text-ink">
           {ctx.faqs.map((f, i) => (
             <FaqItem key={f.id} q={f.question} a={f.answer} i={i} />
           ))}
@@ -383,18 +403,21 @@ function FaqSection({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
 
 // ───────────── Confiança ─────────────
 
-function Trust({ s }: { s: SectionData }) {
+function Trust({ s, tone }: P) {
   const items = cfgArr<IconItem>(s.config, "items").filter((x) => x?.title);
+  const d = dark(tone);
   return (
-    <section className="section bg-mist/60">
+    <section className={`section ${BG[tone]}`}>
       <div className="container-page">
-        <Heading s={s} />
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Heading s={s} tone={tone} center />
+        <ul className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
           {items.map((it, i) => (
-            <li key={i} className="rounded-card border border-line bg-surface p-5">
-              <Icon name={it.icon ?? "shield"} className="h-7 w-7 text-primary" />
-              <p className="mt-3 font-semibold text-navy">{it.title}</p>
-              {it.text && <p className="mt-1 text-sm leading-relaxed text-muted">{it.text}</p>}
+            <li key={i} className={`flex flex-col rounded-card p-4 sm:p-6 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : tone === "mist" ? "bg-surface shadow-soft ring-1 ring-line" : "bg-mist/60"}`}>
+              <span className={`grid h-11 w-11 place-items-center rounded-full ${d ? "bg-white/10 text-sky-300" : "bg-primary/10 text-primary"}`}>
+                <Icon name={it.icon ?? "shield"} className="h-6 w-6" />
+              </span>
+              <p className={`mt-4 text-[15px] font-semibold leading-snug ${d ? "text-white" : "text-navy"}`}>{it.title}</p>
+              {it.text && <p className={`mt-1.5 text-[13px] leading-relaxed ${d ? "text-white/65" : "text-muted"}`}>{it.text}</p>}
             </li>
           ))}
         </ul>
@@ -405,29 +428,31 @@ function Trust({ s }: { s: SectionData }) {
 
 // ───────────── CTA final ─────────────
 
-function FinalCta({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
-  const img = s.imageUrl || ctx.product?.mainImage?.url;
+function FinalCta({ s, ctx, tone }: P) {
+  const img = s.imageUrl || productImg(ctx);
+  const d = dark(tone);
   return (
-    <section className="bg-navy">
-      <div className="container-page grid items-center gap-8 py-14 md:grid-cols-[1.3fr_1fr] md:py-16">
-        <div>
-          <h2 className="h-section text-white">{s.title}</h2>
-          {s.subtitle && <p className="mt-3 text-lg text-white/75">{s.subtitle}</p>}
+    <section className={`relative overflow-hidden ${BG[tone]}`}>
+      {d && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(45%_60%_at_80%_50%,rgb(var(--c-primary)/0.35),transparent_70%)]" />}
+      <div className="container-page relative grid items-center gap-6 py-14 md:grid-cols-[1.2fr_1fr] md:py-20">
+        {img && (
+          <Stage tone="onDark" className="mx-auto aspect-square w-full max-w-[16rem] md:order-2 md:max-w-[22rem]">
+            <ProductStack src={img} alt={productAlt(ctx)} className="absolute inset-x-0 bottom-[8%] top-[6%]" />
+          </Stage>
+        )}
+        <div className="text-center md:text-left">
+          <h2 className={`h-section ${d ? "!text-white" : ""}`}>{s.title}</h2>
+          {s.subtitle && <p className={`mt-3 text-lg ${d ? "text-white/75" : "text-muted"}`}>{s.subtitle}</p>}
           <a href={s.ctaTarget || "#ofertas"} data-cta="final_cta" className="btn-primary mt-8 w-full sm:w-auto sm:px-10">
             {s.ctaLabel || "Comprar"}
           </a>
         </div>
-        {img && (
-          <div className="hidden rounded-[2rem] bg-white p-6 md:block">
-            <img src={img} alt="" className="mx-auto h-auto max-h-72 w-auto object-contain" loading="lazy" />
-          </div>
-        )}
       </div>
     </section>
   );
 }
 
-const RENDERERS: Record<string, (p: { s: SectionData; ctx: LandingCtx }) => React.ReactNode> = {
+const RENDERERS: Record<string, (p: P) => React.ReactNode> = {
   hero: Hero,
   pain: Pain,
   solution: Solution,
@@ -441,7 +466,48 @@ const RENDERERS: Record<string, (p: { s: SectionData; ctx: LandingCtx }) => Reac
   final_cta: FinalCta,
 };
 
-export function LandingSection({ s, ctx }: { s: SectionData; ctx: LandingCtx }) {
+/** Cor padrão de cada tipo de seção (o admin pode trocar em "Fundo"). */
+export const DEFAULT_TONE: Record<string, Tone> = {
+  hero: "white",
+  pain: "navy",
+  solution: "white",
+  how_it_works: "mist",
+  demo: "white",
+  benefits: "white",
+  testimonials: "mist",
+  offers: "navy",
+  faq: "mist",
+  trust: "white",
+  final_cta: "navy",
+};
+
+/** Seções que realmente aparecem (sem conteúdo real, algumas ficam ocultas). */
+export function isVisible(s: SectionData, ctx: LandingCtx) {
+  if (!s.active || !RENDERERS[s.type]) return false;
+  if (s.type === "demo") return hasDemo(s, ctx);
+  if (s.type === "testimonials") return ctx.testimonials.length > 0;
+  if (s.type === "faq") return ctx.faqs.length > 0;
+  if (s.type === "offers") return Boolean(ctx.product?.offers.length);
+  return true;
+}
+
+/**
+ * Fundo de cada seção visível: escolha do admin (config.tone) ou padrão do tipo. No automático,
+ * alterna branco/cinza para nunca deixar duas seções seguidas com a mesma cor.
+ */
+export function assignTones(sections: SectionData[]): Tone[] {
+  const out: Tone[] = [];
+  sections.forEach((s, i) => {
+    const chosen = cfgStr(s.config, "tone");
+    const manual = chosen === "white" || chosen === "mist" || chosen === "navy";
+    let t: Tone = manual ? (chosen as Tone) : DEFAULT_TONE[s.type] ?? "white";
+    if (!manual && i > 0 && out[i - 1] === t) t = t === "mist" ? "white" : "mist";
+    out.push(t);
+  });
+  return out;
+}
+
+export function LandingSection({ s, ctx, tone }: P) {
   const R = RENDERERS[s.type];
-  return R ? <R s={s} ctx={ctx} /> : null;
+  return R ? <R s={s} ctx={ctx} tone={tone} /> : null;
 }

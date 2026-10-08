@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import type { IconItem, ProductSpec } from "@/lib/domain";
-import type { PublicImage, PublicOffer, PublicProduct } from "@/types/catalog";
+import type { PublicBump, PublicImage, PublicOffer, PublicProduct } from "@/types/catalog";
 
 const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
@@ -81,4 +81,22 @@ export async function findSellableOffer(idOrSlug: string) {
   if (!offer || !offer.active || offer.priceCents <= 0 || !offer.product.active) return null;
   if (offer.product.stockQuantity != null && offer.product.stockQuantity < offer.quantity) return null;
   return offer;
+}
+
+/** Order bumps ativos (leitura sem cache: o checkout sempre mostra o preço atual). */
+export async function getActiveBumps(): Promise<PublicBump[]> {
+  const rows = await db.orderBump.findMany({ where: { active: true, product: { active: true } }, include: { product: { include: { images: { where: { role: "MAIN" }, take: 1 } } } }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
+  return rows
+    .filter((b) => b.priceCents > 0)
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      description: b.description,
+      quantity: b.quantity,
+      priceCents: b.priceCents,
+      compareAtPriceCents: b.compareAtPriceCents && b.compareAtPriceCents > b.priceCents ? b.compareAtPriceCents : null,
+      imageUrl: b.imageUrl || b.product.images[0]?.url || null,
+      badge: b.badge,
+      productName: b.product.name,
+    }));
 }

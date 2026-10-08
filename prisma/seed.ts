@@ -32,6 +32,7 @@ const SECTIONS: { key: string; type: string; label: string; data: Partial<Prisma
     label: "Dor / identificação",
     data: {
       title: "O cigarro foi escolha sua. A mancha nos dedos, não.",
+      imageUrl: "/brand/smoker.webp",
       body:
         "Muita gente não se incomoda em fumar. O que incomoda é olhar para as mãos e perceber a aparência amarelada que o cigarro deixa nos dedos e nas unhas.\n\nEla aparece na hora de cumprimentar alguém, de segurar um copo, de mostrar algo no celular. E lavar as mãos nem sempre resolve.",
       config: {
@@ -47,7 +48,6 @@ const SECTIONS: { key: string; type: string; label: string; data: Partial<Prisma
       title: "Foi pensando nesse problema que criamos o CLEARFINGER.",
       body:
         "Um removedor de manchas de nicotina específico para mãos e unhas. Em vez de improvisar com produtos de limpeza, você usa algo pensado para essa finalidade.\n\nVem em frasco de 30 mL com válvula pump, prático para deixar na bolsa, na mochila ou na pia do banheiro.",
-      imageUrl: "/brand/kit.webp",
       ctaLabel: "Ver kits e preços",
       ctaTarget: "#ofertas",
       config: { points: ["Específico para manchas de nicotina", "Para mãos e unhas", "Frasco de 30 mL com válvula pump", "Uso externo"] },
@@ -131,7 +131,6 @@ const SECTIONS: { key: string; type: string; label: string; data: Partial<Prisma
       subtitle: "Escolha o kit, pague com PIX ou crediário e receba em casa.",
       ctaLabel: "QUERO O MEU CLEARFINGER",
       ctaTarget: "#ofertas",
-      imageUrl: "/brand/kit.webp",
     },
   },
 ];
@@ -185,7 +184,7 @@ async function main() {
         { label: "Indicação", value: "Mãos e unhas" },
         { label: "Uso", value: "Externo" },
       ],
-      images: { create: [{ url: "/brand/kit.webp", alt: "Caixa e frasco do CLEARFINGER, removedor de manchas de nicotina, 30 mL", role: "MAIN", sortOrder: 0 }] },
+      images: { create: [{ url: "/brand/kit-cutout.webp", alt: "Caixa e frasco do CLEARFINGER, removedor de manchas de nicotina, 30 mL", role: "MAIN", sortOrder: 0 }] },
     },
   });
 
@@ -195,6 +194,15 @@ async function main() {
     { slug: "kit-3", name: "Kit com 3 unidades", quantity: 3, priceCents: 13490, compareAtPriceCents: 17970, badge: "Menor preço por unidade", highlight: false, description: "Para usar por mais tempo sem precisar repor.", sortOrder: 3 },
   ];
   for (const o of offers) await db.productOffer.upsert({ where: { slug: o.slug }, update: {}, create: { ...o, productId: product.id } });
+
+  if ((await db.orderBump.count()) === 0) {
+    await db.orderBump.createMany({
+      data: [
+        { productId: product.id, name: "+1 frasco", title: "Adicione +1 frasco com desconto", description: "Um frasco extra para deixar no trabalho ou na bolsa. Oferta exclusiva deste pedido.", quantity: 1, priceCents: 3990, compareAtPriceCents: 5990, badge: "Oferta do checkout", sortOrder: 1 },
+        { productId: product.id, name: "+2 frascos", title: "Leve +2 frascos e não fique sem", description: "Dois frascos extras com preço especial para usar por mais tempo.", quantity: 2, priceCents: 6990, compareAtPriceCents: 11980, badge: "Melhor preço", sortOrder: 2 },
+      ],
+    });
+  }
 
   console.log("Seed concluído:", { sections: await db.landingSection.count(), faqs: await db.faq.count(), offers: await db.productOffer.count() });
 }

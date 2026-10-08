@@ -107,6 +107,7 @@ model Product {
   images              ProductImage[]
   offers              ProductOffer[]
   orderItems          OrderItem[]
+  orderBumps          OrderBump[]
 }
 
 enum ProductImageRole {
@@ -329,8 +330,37 @@ model Order {
   @@index([paidAt])
 }
 
+enum OrderItemKind {
+  OFFER
+  ORDER_BUMP
+}
+
+/// Oferta adicional no checkout (marcar e adicionar ao pedido). Produto, textos, preço e imagem editáveis no admin.
+model OrderBump {
+  id                  String      @id @default(cuid())
+  productId           String
+  product             Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name                String
+  title               String
+  description         String?
+  /// Unidades do produto incluídas no bump
+  quantity            Int         @default(1)
+  priceCents          Int
+  compareAtPriceCents Int?
+  imageUrl            String?
+  badge               String?
+  sortOrder           Int         @default(0)
+  active              Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  orderItems          OrderItem[]
+}
+
 model OrderItem {
   id              String        @id @default(cuid())
+  kind            OrderItemKind @default(OFFER)
+  bumpId          String?
+  bump            OrderBump?    @relation(fields: [bumpId], references: [id], onDelete: SetNull)
   orderId         String
   order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId       String?
