@@ -1,0 +1,20 @@
+export type PublicOrder = {
+  orderNumber: string;
+  status: string;
+  paymentMethod: "PIX" | "CREDIARIO";
+  fulfillmentStatus: string;
+  totalCents: number;
+  subtotalCents: number;
+  discountCents: number;
+  shippingCents: number;
+  pixCopyPaste: string | null;
+  pixExpiresAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  metaEventId: string | null;
+  customerFirstName: string;
+  trackingCode: string | null;
+  pixError: boolean;
+  crediario: { installments: number; installmentLabel: string; methodLabel: string } | null;
+  items: { name: string; offerName: string; quantity: number; units: number; unitPriceCents: number; totalPriceCents: number }[];
+};

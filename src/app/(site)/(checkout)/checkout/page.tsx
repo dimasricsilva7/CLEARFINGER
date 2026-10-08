@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { crediarioConfig } from "@/lib/crediario";
+import { bravopayMode } from "@/lib/env";
+import { getMainProduct } from "@/server/catalog";
+import { getSettings, isOn, settingInt } from "@/server/settings";
+import { CheckoutClient } from "./CheckoutClient";
+
+export const metadata: Metadata = { title: "Finalizar pedido", robots: { index: false, follow: false } };
+export const dynamic = "force-dynamic";
+
+export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ oferta?: string }> }) {
+  const [{ oferta }, product, s] = await Promise.all([searchParams, getMainProduct(), getSettings()]);
+  if (!product?.offers.length) {
+    return (
+      <div className="container-page max-w-lg py-20 text-center">
+        <h1 className="h-section">Produto indisponível no momento</h1>
+        <Link href="/" className="btn-primary mt-8">Voltar</Link>
+      </div>
+    );
+  }
+  const initial = product.offers.find((o) => o.slug === oferta || o.id === oferta) ?? product.offers.find((o) => o.highlight) ?? product.offers[0];
+  const cfg = crediarioConfig(s);
+  return (
+    <CheckoutClient
+      productId={product.id}
+      productName={product.shortName || product.name}
+      sku={product.sku}
+      imageUrl={product.mainImage?.url ?? null}
+      volume={product.specs.find((x) => /conte|volume/i.test(x.label))?.value ?? null}
+      offers={product.offers}
+      initialOfferId={initial.id}
+      shippingCents={Math.max(0, settingInt(s, "shipping_flat_cents", 0))}
+      shippingLabel={s.shipping_label}
+      shippingNote={s.shipping_note}
+      requireCpf={isOn(s.require_cpf)}
+      consentLabel={s.marketing_consent_label}
+      title={s.checkout_title || "Finalizar pedido"}
+      securityText={s.checkout_security_text}
+      pix={{ enabled: isOn(s.pix_enabled) && bravopayMode() !== "disabled", label: s.pix_method_label || "PIX", description: s.pix_description, button: s.pix_button_label || "Gerar PIX" }}
+      crediario={cfg}
+    />
+  );
+}

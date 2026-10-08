@@ -1,0 +1,575 @@
+// CLEARFINGER — schema PostgreSQL
+// Base: HAMA BEADS (pedidos, pagamentos, webhooks, analytics, CMS, auth) + MONTEZ (mídia no banco).
+// Valores monetários sempre em centavos (Int). Preços, textos e imagens vivem no banco e são
+// editados no admin; os pedidos guardam snapshot do que foi vendido.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ───────────────────────── Admin / auth / auditoria ─────────────────────────
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  EDITOR
+}
+
+model AdminUser {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String
+  passwordHash String
+  role         AdminRole      @default(ADMIN)
+  active       Boolean        @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+  auditLogs    AuditLog[]
+}
+
+model AdminSession {
+  id        String    @id @default(cuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([adminId])
+}
+
+/// Tentativas de login (brute force) — persistente entre instâncias serverless.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+/// Alterações administrativas: quem, o quê, valor anterior e novo.
+model AuditLog {
+  id        String     @id @default(cuid())
+  adminId   String?
+  admin     AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String?
+  entityId  String?
+  summary   String?
+  before    Json?
+  after     Json?
+  details   Json?
+  ipHash    String?
+  createdAt DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+// ───────────────────────── Catálogo ─────────────────────────
+
+model Product {
+  id                  String         @id @default(cuid())
+  slug                String         @unique
+  sku                 String         @unique
+  name                String
+  shortName           String?
+  shortDescription    String?
+  description         String?
+  /// Preço unitário de referência (as ofertas/kits definem o preço de venda)
+  priceCents          Int
+  compareAtPriceCents Int?
+  discountLabel       String?
+  /// Estoque (null = sem controle)
+  stockQuantity       Int?
+  active              Boolean        @default(true)
+  videoUrl            String?
+  /// Benefícios: [{ icon, title, text }]
+  benefits            Json           @default("[]")
+  badge               String?
+  /// Informações adicionais: [{ label, value }] (volume, modo de uso, composição…)
+  specs               Json           @default("[]")
+  seoTitle            String?
+  seoDescription      String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  images              ProductImage[]
+  offers              ProductOffer[]
+  orderItems          OrderItem[]
+}
+
+enum ProductImageRole {
+  MAIN
+  SECONDARY
+  GALLERY
+}
+
+/// Imagens do produto: principal, secundária e galeria (reordenável). URL do sistema (/media/…) ou externa.
+model ProductImage {
+  id        String           @id @default(cuid())
+  productId String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String           @default("")
+  role      ProductImageRole @default(GALLERY)
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+
+  @@index([productId, role, sortOrder])
+}
+
+/// Oferta/kit vendido na landing (ex.: Kit 1, 2 e 3 unidades).
+model ProductOffer {
+  id                  String      @id @default(cuid())
+  slug                String      @unique
+  productId           String
+  product             Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name                String
+  quantity            Int         @default(1)
+  priceCents          Int
+  compareAtPriceCents Int?
+  /// Texto de desconto (vazio = calculado a partir do preço antigo)
+  discountLabel       String?
+  /// Selo (ex.: "Recomendado") — nunca use "mais vendido" sem dados reais
+  badge               String?
+  highlight           Boolean     @default(false)
+  description         String?
+  imageUrl            String?
+  sortOrder           Int         @default(0)
+  active              Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  orderItems          OrderItem[]
+  priceHistory        PriceHistory[]
+
+  @@index([active, sortOrder])
+}
+
+model PriceHistory {
+  id            String       @id @default(cuid())
+  offerId       String
+  offer         ProductOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  oldPriceCents Int?
+  newPriceCents Int
+  adminId       String?
+  createdAt     DateTime     @default(now())
+
+  @@index([offerId, createdAt])
+}
+
+// ───────────────────────── Mídia (padrão MONTEZ: bytes no Postgres + CDN) ─────────────────────────
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  alt       String   @default("")
+  category  String   @default("OUTROS")
+  mimeType  String?
+  size      Int?
+  width     Int?
+  height    Int?
+  /// "db" = bytes em `data` servidos por /media/[id].webp · "static" = arquivo em /public · "link" = URL externa
+  storage   String   @default("db")
+  data      Bytes?
+  sourceUrl String?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, sortOrder])
+}
+
+// ───────────────────────── Clientes / pedidos ─────────────────────────
+
+model Customer {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String
+  phone            String
+  cpf              String?
+  marketingConsent Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  orders           Order[]
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIARIO
+}
+
+/// Status do pedido. PIX segue o ciclo do gateway (BravoPay); CREDIÁRIO tem estados próprios,
+/// alterados pelo admin após a análise do protocolo. A entrega fica em `fulfillmentStatus`.
+enum OrderStatus {
+  PENDING
+  PIX_GENERATED
+  PAID
+  EXPIRED
+  CANCELLED
+  REFUNDED
+  CHARGEBACK
+  FAILED
+  CREDIARIO_PENDENTE
+  CREDIARIO_EM_ANALISE
+  CREDIARIO_APROVADO
+  CREDIARIO_RECUSADO
+  CREDIARIO_CANCELADO
+  CREDIARIO_CONCLUIDO
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  REFUNDED
+  CHARGEBACK
+  FAILED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+model Order {
+  id                 String            @id @default(cuid())
+  seq                Int               @unique @default(autoincrement())
+  orderNumber        String?           @unique
+  customerId         String
+  customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /// Snapshot do cliente e do endereço no momento da compra
+  customerSnapshot   Json
+  shippingAddress    Json?
+  paymentMethod      PaymentMethod     @default(PIX)
+  status             OrderStatus       @default(PENDING)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  fulfillmentStatus  FulfillmentStatus @default(PENDING)
+  trackingCode       String?
+  subtotalCents      Int
+  discountCents      Int               @default(0)
+  shippingCents      Int               @default(0)
+  totalCents         Int
+  paymentProvider    String?
+  transactionId      String?           @unique
+  externalReference  String?           @unique
+  pixCopyPaste       String?
+  pixExpiresAt       DateTime?
+  paymentError       String?
+  paidAmountCents    Int?
+  feeCents           Int?
+  netCents           Int?
+  /// Chave de idempotência gerada no navegador: impede pedido duplicado em duplo clique
+  checkoutToken      String?           @unique
+  /// Token secreto para acessar o pedido por link
+  accessToken        String            @unique
+  metaEventId        String?
+  adsConsent         Boolean           @default(false)
+  // Atribuição — last touch nos campos principais + first touch
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  utmContent         String?
+  utmTerm            String?
+  firstTouchSource   String?
+  firstTouchMedium   String?
+  firstTouchCampaign String?
+  firstTouchContent  String?
+  firstTouchTerm     String?
+  fbclid             String?
+  gclid              String?
+  ttclid             String?
+  fbp                String?
+  fbc                String?
+  landingPage        String?
+  referrer           String?
+  sessionId          String?
+  visitorId          String?
+  device             String?
+  userAgent          String?
+  ipHash             String?
+  channel            String?
+  // Ciclo de vida
+  paidAt             DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  expiredAt          DateTime?
+  cancelledAt        DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  lastCheckedAt      DateTime?
+  purchaseTrackedAt  DateTime?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  items              OrderItem[]
+  payments           Payment[]
+  paymentEvents      PaymentEvent[]
+  crediario          CrediarioData?
+  utm                UtmData?
+
+  @@index([status, createdAt])
+  @@index([paymentMethod, createdAt])
+  @@index([createdAt])
+  @@index([customerId])
+  @@index([paidAt])
+}
+
+model OrderItem {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  offerId         String?
+  offer           ProductOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  // Snapshot — alterações futuras no produto/oferta não mudam o histórico
+  productName     String
+  offerName       String
+  sku             String
+  /// Unidades do produto dentro da oferta (ex.: kit 3 = 3)
+  unitsPerOffer   Int           @default(1)
+  quantity        Int
+  unitPriceCents  Int
+  listPriceCents  Int
+  totalPriceCents Int
+
+  @@index([orderId])
+  @@index([offerId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider      String        @default("bravopay")
+  transactionId String        @unique
+  method        String        @default("PIX")
+  status        PaymentStatus @default(PENDING)
+  amountCents   Int
+  feeCents      Int?
+  netCents      Int?
+  paidAt        DateTime?
+  metadata      Json?
+  tracking      Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orderId])
+}
+
+/// Linha do tempo do pedido/pagamento (requisições, respostas, webhooks, polling, mudanças de status).
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String
+  status    String?
+  message   String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+/// Dados do CREDIÁRIO (protocolo do cliente — NÃO é cartão). Protocolo, validade e dígitos do CPF
+/// ficam cifrados (AES-256-GCM); só o admin autorizado vê, e nunca vão para Meta/Google/logs.
+model CrediarioData {
+  id                String   @id @default(cuid())
+  orderId           String   @unique
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  protocolEnc       String
+  protocolLast4     String
+  validityEnc       String
+  cpfLast3Enc       String
+  validityFormat    String
+  installments      Int
+  installmentCents  Int
+  /// Rótulo exibido ao cliente no momento da compra (ex.: "2x de R$ 29,95")
+  installmentLabel  String
+  methodLabel       String
+  analysisNote      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// UTMs e click IDs do pedido em tabela própria (consulta/relatórios). Os campos principais também ficam no Order.
+model UtmData {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  source      String?
+  medium      String?
+  campaign    String?
+  content     String?
+  term        String?
+  adset       String?
+  ad          String?
+  gclid       String?
+  fbclid      String?
+  ttclid      String?
+  landingPage String?
+  referrer    String?
+  raw         Json?
+  createdAt   DateTime @default(now())
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+/// Registro de webhooks — eventId único garante idempotência.
+model WebhookEvent {
+  id             String        @id @default(cuid())
+  provider       String        @default("bravopay")
+  eventId        String        @unique
+  eventType      String
+  status         WebhookStatus @default(RECEIVED)
+  transactionId  String?
+  orderId        String?
+  previousStatus String?
+  newStatus      String?
+  result         String?
+  payloadHash    String
+  payload        Json
+  error          String?
+  attempts       Int           @default(1)
+  receivedAt     DateTime      @default(now())
+  processedAt    DateTime?
+
+  @@index([receivedAt])
+  @@index([transactionId])
+}
+
+// ───────────────────────── Analytics próprio ─────────────────────────
+
+model VisitorSession {
+  id          String           @id
+  visitorId   String
+  customerId  String?
+  firstSeenAt DateTime         @default(now())
+  lastSeenAt  DateTime         @default(now())
+  landingPage String?
+  exitPage    String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  fbclid      String?
+  gclid       String?
+  ttclid      String?
+  channel     String?
+  device      String?
+  browser     String?
+  os          String?
+  pageViews   Int              @default(0)
+  events      TrackingEvent[]
+
+  @@index([firstSeenAt])
+  @@index([lastSeenAt])
+  @@index([visitorId])
+}
+
+/// Evento próprio. Origem e dispositivo vêm da sessão e são copiados aqui para relatórios rápidos.
+model TrackingEvent {
+  id          String         @id @default(cuid())
+  sessionId   String
+  session     VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  visitorId   String
+  customerId  String?
+  orderId     String?
+  name        String
+  path        String?
+  productId   String?
+  offerId     String?
+  element     String?
+  valueCents  Int?
+  props       Json?
+  device      String?
+  utmSource   String?
+  utmCampaign String?
+  createdAt   DateTime       @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+  @@index([sessionId])
+}
+
+// ───────────────────────── CMS ─────────────────────────
+
+/// Bloco da landing page. `config` guarda os campos específicos de cada seção.
+model LandingSection {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  type      String
+  label     String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  title     String?
+  subtitle  String?
+  body      String?
+  imageUrl  String?
+  videoUrl  String?
+  ctaLabel  String?
+  ctaTarget String?
+  config    Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+/// Somente depoimentos reais, cadastrados e autorizados.
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  text      String
+  rating    Int      @default(5)
+  avatarUrl String?
+  city      String?
+  active    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Configurações (chave/valor) — textos do checkout, crediário, PIX, marca, tracking, SEO, políticas.
+model SiteSettings {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+/// Trava simples para jobs (evita duas execuções simultâneas).
+model JobLock {
+  name      String   @id
+  lockedAt  DateTime
+  expiresAt DateTime
+}

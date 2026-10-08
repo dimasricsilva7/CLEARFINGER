@@ -1,0 +1,20 @@
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# env — NUNCA commitar segredos
+.env
+.env.*
+!.env.example
+.admin-dev-password
+
+.vercel
+.DS_Store
+npm-debug.log*
+public/uploads/
+screenshots/
+test-results/
+.admin-prod-password

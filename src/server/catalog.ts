@@ -1,0 +1,84 @@
+import "server-only";
+import { unstable_cache } from "next/cache";
+import { db } from "@/lib/db";
+import type { IconItem, ProductSpec } from "@/lib/domain";
+import type { PublicImage, PublicOffer, PublicProduct } from "@/types/catalog";
+
+const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+async function loadMainProduct() {
+  // O produto principal é o primeiro ativo (o projeto suporta vários; a landing vende um)
+  return db.product.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: "asc" },
+    include: { images: { orderBy: [{ role: "asc" }, { sortOrder: "asc" }] }, offers: { where: { active: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+  });
+}
+type ProductRow = NonNullable<Awaited<ReturnType<typeof loadMainProduct>>>;
+
+export function toPublicOffer(o: ProductRow["offers"][number]): PublicOffer {
+  return {
+    id: o.id,
+    slug: o.slug,
+    name: o.name,
+    quantity: o.quantity,
+    priceCents: o.priceCents,
+    compareAtPriceCents: o.compareAtPriceCents && o.compareAtPriceCents > o.priceCents ? o.compareAtPriceCents : null,
+    discountLabel: o.discountLabel,
+    badge: o.badge,
+    highlight: o.highlight,
+    description: o.description,
+    imageUrl: o.imageUrl,
+    unitPriceCents: Math.round(o.priceCents / Math.max(1, o.quantity)),
+  };
+}
+
+export function toPublicProduct(p: ProductRow): PublicProduct {
+  const img = (i: ProductRow["images"][number]): PublicImage => ({ url: i.url, alt: i.alt || p.name, role: i.role });
+  return {
+    id: p.id,
+    slug: p.slug,
+    sku: p.sku,
+    name: p.name,
+    shortName: p.shortName,
+    shortDescription: p.shortDescription,
+    description: p.description,
+    priceCents: p.priceCents,
+    compareAtPriceCents: p.compareAtPriceCents,
+    badge: p.badge,
+    videoUrl: p.videoUrl,
+    benefits: asArray<IconItem>(p.benefits).filter((b) => b?.title),
+    specs: asArray<ProductSpec>(p.specs).filter((s) => s?.label && s?.value),
+    mainImage: p.images.find((i) => i.role === "MAIN") ? img(p.images.find((i) => i.role === "MAIN")!) : p.images[0] ? img(p.images[0]) : null,
+    secondaryImage: p.images.find((i) => i.role === "SECONDARY") ? img(p.images.find((i) => i.role === "SECONDARY")!) : null,
+    gallery: p.images.filter((i) => i.role === "GALLERY").map(img),
+    offers: p.offers.filter((o) => o.priceCents > 0).map(toPublicOffer),
+  };
+}
+
+const cachedProduct = unstable_cache(
+  async () => {
+    const p = await loadMainProduct(); // erro do banco lança: nunca vai para o cache
+    return p ? toPublicProduct(p) : null;
+  },
+  ["cf-main-product-v1"],
+  { tags: ["catalog"], revalidate: 300 }
+);
+
+/** Produto principal + ofertas ativas (cache invalidado pela tag "catalog"). Falha do banco → leitura direta. */
+export async function getMainProduct(): Promise<PublicProduct | null> {
+  try {
+    return await cachedProduct();
+  } catch {
+    const p = await loadMainProduct().catch(() => null);
+    return p ? toPublicProduct(p) : null;
+  }
+}
+
+/** Oferta vendável (ativa, com preço e produto ativo) — leitura sem cache, usada no checkout. */
+export async function findSellableOffer(idOrSlug: string) {
+  const offer = await db.productOffer.findFirst({ where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }, include: { product: true } });
+  if (!offer || !offer.active || offer.priceCents <= 0 || !offer.product.active) return null;
+  if (offer.product.stockQuantity != null && offer.product.stockQuantity < offer.quantity) return null;
+  return offer;
+}
