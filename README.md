@@ -91,7 +91,7 @@ Cadastre no painel BravoPay: `https://SEU-DOMINIO/api/webhooks/bravopay` e copie
 
 `/admin` — login com bcrypt, sessão httpOnly de 12 h, bloqueio após tentativas, papéis OWNER/ADMIN/EDITOR, auditoria de todas as alterações.
 
-Dashboard (PIX e crediário separados, gráficos, filtro de período) · Funil · Métricas (pagamentos e UTMs) · Tracking e online · Pedidos · Clientes · Produtos (imagens principal/secundária/galeria) · Ofertas e kits · Imagens (upload de arquivo **ou** URL) · Landing page (ordem, visibilidade e conteúdo de cada seção) · Depoimentos · FAQ · Pagamentos (PIX, Crediário) · Webhooks · Configurações (marca, empresa, aparência, checkout/envio, tracking, SEO, políticas, sistema) · Auditoria · Usuários.
+Dashboard (PIX e crediário separados, gráficos, filtro de período) · Funil · Métricas (pagamentos e UTMs) · Tracking e online · Pedidos · Clientes · Produtos (imagens principal/secundária/galeria) · Ofertas e kits · Order bumps (produto, preço, textos e imagem) · Imagens (upload de arquivo **ou** URL) · Landing page (ordem, visibilidade, cor de fundo e conteúdo de cada seção) · Depoimentos · FAQ · Pagamentos (PIX, Crediário) · Webhooks · Configurações (marca, empresa, aparência, checkout/envio, tracking, SEO, políticas, sistema) · Auditoria · Usuários.
 
 **Imagens**: todo campo de imagem tem *Enviar arquivo* (escolher ou arrastar), *Usar URL* (guardar uma cópia otimizada no site ou usar o link direto) e *Biblioteca*. Links internos/privados são bloqueados (proteção SSRF).
 
@@ -104,6 +104,8 @@ Dashboard (PIX e crediário separados, gráficos, filtro de período) · Funil �
 5. Cadastrar o webhook na BravoPay e o `BRAVOPAY_WEBHOOK_SECRET`.
 6. Domínio próprio em Vercel → Domains (HTTPS automático) e `NEXT_PUBLIC_SITE_URL` com o domínio final.
 7. Jobs: Vercel Cron diário já está em `vercel.json`; para reconciliação frequente, configure os secrets `SITE_URL`/`CRON_SECRET` no GitHub (workflow `jobs`) ou um agendador externo chamando `GET /api/tick` a cada 1–5 min.
+
+Trocar de banco (ex.: do temporário para o permanente): renomeie as variáveis antigas para `LEGACY_DATABASE_URL`, conecte o novo banco (que cria `DATABASE_URL`), publique de novo (as migrations rodam no build) e chame `GET /api/cron/migrate-legacy` com `Authorization: Bearer <CRON_SECRET>` — copia todos os dados, inclusive imagens.
 
 Recuperar acesso ao admin: defina `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` e chame `GET /api/cron/reset-admin` com `Authorization: Bearer <CRON_SECRET>`.
 
