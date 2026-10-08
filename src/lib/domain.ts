@@ -57,6 +57,23 @@ export type IconItem = { icon?: string; title: string; text?: string };
 
 export const ICONS = ["sparkle", "drop", "hand", "shield", "leaf", "clock", "truck", "lock", "chat", "pix", "check", "star", "box", "heart"] as const;
 export type IconName = (typeof ICONS)[number];
+/** Nomes em português dos ícones (seletor do admin). */
+export const ICON_LABEL: Record<IconName, string> = {
+  sparkle: "Brilho / resultado",
+  drop: "Gota / produto",
+  hand: "Mão",
+  shield: "Escudo / proteção",
+  leaf: "Folha / suave",
+  clock: "Relógio / rapidez",
+  truck: "Caminhão / entrega",
+  lock: "Cadeado / segurança",
+  chat: "Balão / atendimento",
+  pix: "PIX",
+  check: "Visto / confirmado",
+  star: "Estrela / qualidade",
+  box: "Caixa / embalagem",
+  heart: "Coração / cuidado",
+};
 
 // ───────────── Analytics ─────────────
 

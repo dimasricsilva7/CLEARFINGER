@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { inputCls, textareaCls, btnSecondary } from "./ui";
-import { ICONS } from "@/lib/domain";
+import { ICONS, ICON_LABEL, type IconName } from "@/lib/domain";
+import { Icon } from "@/components/ui/Icon";
 
 import { ImageField } from "./media";
 export { ImageField };
@@ -29,7 +30,7 @@ export function VideoInput({ name, label, defaultValue }: { name: string; label:
   );
 }
 
-export type ListField = { key: string; label: string; type?: "text" | "textarea" | "select" | "checkbox" | "media" | "number"; options?: readonly string[]; width?: string; placeholder?: string };
+export type ListField = { key: string; label: string; type?: "text" | "textarea" | "select" | "checkbox" | "media" | "number" | "icon"; options?: readonly string[]; width?: string; placeholder?: string };
 
 /**
  * Editor de listas JSON (composição do kit, especificações, passos, benefícios…).
@@ -56,6 +57,8 @@ export function ListEditor<T extends Record<string, unknown>>({ name, fields, de
               <p className="mb-0.5 text-[10px] font-semibold uppercase text-slate-400">{f.label}</p>
               {f.type === "textarea" ? (
                 <textarea value={String(it[f.key] ?? "")} onChange={(e) => update(i, f.key, e.target.value)} rows={2} className={textareaCls} />
+              ) : f.type === "icon" ? (
+                <IconPicker value={String(it[f.key] ?? "check")} onChange={(v) => update(i, f.key, v)} />
               ) : f.type === "select" ? (
                 <select value={String(it[f.key] ?? "")} onChange={(e) => update(i, f.key, e.target.value)} className={inputCls}>
                   {f.options?.map((o) => <option key={o}>{o}</option>)}
@@ -79,6 +82,36 @@ export function ListEditor<T extends Record<string, unknown>>({ name, fields, de
       <button type="button" onClick={() => setItems((l) => [...l, newItem()])} className={btnSecondary}>
         + {addLabel}
       </button>
+    </div>
+  );
+}
+
+/** Seletor visual de ícone: mostra o desenho e o nome em português (protegido do tradutor automático). */
+export function IconPicker({ value, onChange }: { value: string; onChange: (v: IconName) => void }) {
+  const [open, setOpen] = useState(false);
+  const current = (ICONS as readonly string[]).includes(value) ? (value as IconName) : "check";
+  return (
+    <div className="relative" translate="no">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="listbox" className={`${inputCls} flex items-center gap-2 text-left`}>
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-blue-600 text-white"><Icon name={current} className="h-4 w-4" strokeWidth={2} /></span>
+        <span className="truncate text-sm">{ICON_LABEL[current]}</span>
+        <span aria-hidden="true" className="ml-auto text-slate-400">▾</span>
+      </button>
+      {open && (
+        <>
+          <button type="button" aria-label="Fechar" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+          <ul role="listbox" className="absolute left-0 z-50 mt-1 grid w-[300px] grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+            {ICONS.map((ic) => (
+              <li key={ic}>
+                <button type="button" role="option" aria-selected={ic === current} onClick={() => { onChange(ic); setOpen(false); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${ic === current ? "bg-blue-50 font-semibold text-blue-800 ring-1 ring-blue-200" : "hover:bg-slate-50"}`}>
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-blue-600 text-white"><Icon name={ic} className="h-4 w-4" strokeWidth={2} /></span>
+                  {ICON_LABEL[ic]}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -114,7 +147,7 @@ export function IconItemsEditor({ name, defaultValue }: { name: string; defaultV
       defaultValue={defaultValue}
       addLabel="Adicionar item"
       newItem={() => ({ icon: "check", title: "", text: "" })}
-      fields={[{ key: "icon", label: "Ícone", type: "select", options: ICONS, width: "w-32" }, { key: "title", label: "Título" }, { key: "text", label: "Texto", type: "textarea" }]}
+      fields={[{ key: "icon", label: "Ícone", type: "icon", width: "w-44" }, { key: "title", label: "Título" }, { key: "text", label: "Texto", type: "textarea" }]}
     />
   );
 }
