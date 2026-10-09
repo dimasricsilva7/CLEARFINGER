@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma, type Order, type OrderStatus, type PaymentStatus as DbPaymentStatus } from "@prisma/client";
 import { randomInt } from "crypto";
 import { db } from "@/lib/db";
-import { bravopayMode, siteUrl } from "@/lib/env";
+import { bravopayMode, isProductionDeploy, siteUrl } from "@/lib/env";
 import { log } from "@/lib/log";
 import { encryptField, hashIp, randomToken, safeEqual } from "@/lib/crypto";
 import { paymentService, PaymentError, type PaymentSnapshot, type PaymentStatus } from "@/lib/payments";
@@ -107,6 +107,19 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
   if (existing) {
     if (existing.paymentMethod === "PIX" && existing.status === "PENDING" && !existing.pixCopyPaste) return { order: await ensurePix(existing.id), reused: true };
     return { order: existing, reused: true };
+  }
+
+  // Anti-abuso persistente (vale entre instâncias): impede gerar cobranças PIX em massa
+  if (isProductionDeploy()) {
+    const ipHash = hashIp(meta.ip);
+    const [byIp, unpaidByEmail] = await Promise.all([
+      ipHash ? db.order.count({ where: { ipHash, createdAt: { gte: new Date(Date.now() - 15 * 60_000) } } }) : 0,
+      db.order.count({ where: { customer: { email: input.customer.email }, status: { in: ["PENDING", "PIX_GENERATED"] }, createdAt: { gte: new Date(Date.now() - 60 * 60_000) } } }),
+    ]);
+    if (byIp >= 8 || unpaidByEmail >= 5) {
+      log.warn("checkout", "limite de pedidos atingido", { byIp, unpaidByEmail });
+      throw new CheckoutError("Você já tem pedidos aguardando pagamento. Conclua um deles ou aguarde alguns minutos.", 429);
+    }
   }
 
   const settings = await getSettingsFresh();

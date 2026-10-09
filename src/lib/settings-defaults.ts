@@ -13,7 +13,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   // Empresa e contato — preencher com dados reais (vazio = não exibido)
   company_name: "Clear Industria e Comercio de Produtos LTDA",
   company_document: "57.732.599/0001-75",
-  contact_email: "contato@clearfinger.shop",
+  contact_email: "contato@clearfingerbr.shop",
   contact_phone: "",
   whatsapp: "1142305480",
   address: "",
@@ -33,6 +33,8 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   sticky_cta_label: "QUERO O MEU CLEARFINGER",
   footer_text: "",
   // Envio
+  meta_domain_verification: "",
+  google_site_verification: "",
   // Anúncios (Admin → Anúncios e ROAS)
   ads_account_ids: "",
   ads_fx_mode: "ptax",
@@ -157,20 +159,20 @@ Processar e entregar o pedido, gerar o pagamento PIX junto ao processador de pag
 Com o processador de pagamentos (PIX), com a transportadora e, se você não recusar os cookies de marketing, com plataformas de anúncios (Meta, Google). Dados do crediário nunca são enviados a plataformas de anúncios.
 
 4. Seus direitos (LGPD)
-Você pode solicitar acesso, correção ou exclusão dos seus dados pelo e-mail contato@clearfinger.shop.
+Você pode solicitar acesso, correção ou exclusão dos seus dados pelo e-mail contato@clearfingerbr.shop.
 
 5. Controlador
-Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.`,
+Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfingerbr.shop, WhatsApp (11) 4230-5480.`,
   policy_terms: `Termos de Uso
 
-Este site é operado por Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.
+Este site é operado por Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfingerbr.shop, WhatsApp (11) 4230-5480.
 
 Ao comprar neste site você concorda com as condições de venda, prazos e políticas publicadas. Preços e ofertas podem ser alterados sem aviso, sem afetar pedidos já realizados. Pedidos no crediário são confirmados somente após a análise do protocolo informado.`,
   policy_returns: `Política de Troca e Devolução
 
-Compras online podem ser canceladas em até 7 dias corridos após o recebimento (art. 49 do Código de Defesa do Consumidor). Produtos com defeito podem ser trocados conforme a legislação. Para solicitar, entre em contato pelo e-mail contato@clearfinger.shop ou pelo WhatsApp (11) 4230-5480 informando o número do pedido — vamos orientar você sobre como fazer a devolução.
+Compras online podem ser canceladas em até 7 dias corridos após o recebimento (art. 49 do Código de Defesa do Consumidor). Produtos com defeito podem ser trocados conforme a legislação. Para solicitar, entre em contato pelo e-mail contato@clearfingerbr.shop ou pelo WhatsApp (11) 4230-5480 informando o número do pedido — vamos orientar você sobre como fazer a devolução.
 
-Responsável: Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfinger.shop, WhatsApp (11) 4230-5480.`,
+Responsável: Clear Industria e Comercio de Produtos LTDA, CNPJ 57.732.599/0001-75 — e-mail contato@clearfingerbr.shop, WhatsApp (11) 4230-5480.`,
   policy_cookies: `Política de Cookies
 
 Usamos cookies essenciais para o funcionamento do site (sessão e segurança) e cookies de medição e marketing (Meta Pixel e Google) para medir e melhorar nossos anúncios. Os cookies de medição e marketing ficam ativos por padrão e você pode recusá-los a qualquer momento pelo aviso de cookies ou pelo link "Preferências de cookies" no rodapé. Depois de recusar, nenhum dado da sua navegação ou compra é enviado ao Meta ou ao Google.`,

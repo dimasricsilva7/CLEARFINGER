@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isProductionDeploy } from "@/lib/env";
+import { isScriptClient } from "@/lib/security";
 import { z } from "zod";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/request";
@@ -19,6 +21,7 @@ const NOT_FOUND = "Não encontramos um pedido com esses dados. Confira o número
 /** Consulta pública de rastreio: pedido + CPF ou pedido + e-mail. Resposta genérica para qualquer divergência. */
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (isProductionDeploy() && isScriptClient(req.headers.get("user-agent"))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const ip = getClientIp(req.headers);
   if (!rateLimit(`rastrear:${ip}`, 10, 5 * 60_000)) return NextResponse.json({ error: "Muitas consultas. Aguarde alguns minutos e tente novamente." }, { status: 429 });
 

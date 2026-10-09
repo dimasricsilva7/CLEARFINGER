@@ -7,7 +7,7 @@ export type SendResult = { ok: true; id: string | null } | { ok: false; error: s
 /**
  * Resend (API REST, sem SDK). Credenciais só em variáveis de ambiente:
  *   RESEND_API_KEY   re_...
- *   EMAIL_FROM       "CLEARFINGER <pedidos@clearfinger.shop>" (domínio verificado na Resend)
+ *   EMAIL_FROM       "CLEARFINGER <pedidos@clearfingerbr.shop>" (domínio verificado na Resend)
  *   EMAIL_REPLY_TO   opcional (e-mail de atendimento)
  * Sem chave em desenvolvimento, EMAIL_PROVIDER=console apenas registra no log.
  */

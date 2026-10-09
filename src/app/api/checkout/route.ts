@@ -4,6 +4,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/request";
 import { log } from "@/lib/log";
 import { CheckoutError, createCheckoutOrder } from "@/server/orders";
+import { isProductionDeploy } from "@/lib/env";
+import { isScriptClient, looksLikeBotSubmission } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -11,6 +13,7 @@ export const maxDuration = 30;
 /** Cria o pedido (PIX ou CREDIÁRIO). Dados do crediário nunca vão para URL, logs ou plataformas de anúncio. */
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
+  if (isProductionDeploy() && isScriptClient(req.headers.get("user-agent"))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const ip = getClientIp(req.headers);
   if (!rateLimit(`checkout:${ip}`, 10, 10 * 60_000)) {
     return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos e tente novamente." }, { status: 429 });
@@ -20,6 +23,11 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     const fields = Object.fromEntries(parsed.error.issues.map((i) => [i.path.join("."), i.message]));
     return NextResponse.json({ error: "Confira os dados informados.", fields }, { status: 422 });
+  }
+  // Robô: campo isca preenchido ou formulário enviado rápido demais — resposta genérica, nada é criado
+  if (looksLikeBotSubmission({ hp: parsed.data.hp, elapsedMs: parsed.data.elapsedMs })) {
+    log.warn("checkout", "envio bloqueado (sinais de robô)", { ip: ip.replace(/\.\d+$/, ".x") });
+    return NextResponse.json({ error: "Não foi possível concluir. Recarregue a página e tente novamente." }, { status: 422 });
   }
   const vid = req.cookies.get("cf_vid")?.value;
   const input = vid ? { ...parsed.data, context: { ...parsed.data.context, visitorId: vid } } : parsed.data;

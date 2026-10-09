@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isProductionDeploy } from "@/lib/env";
+import { isScriptClient } from "@/lib/security";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp, isSameOrigin } from "@/lib/request";
 import { log } from "@/lib/log";
@@ -9,6 +11,7 @@ export const dynamic = "force-dynamic";
 /** Upsell pós-compra: view / accept / decline. Aceitar cria um pedido PIX novo; o pedido original nunca é alterado. */
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (isProductionDeploy() && isScriptClient(req.headers.get("user-agent"))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const ip = getClientIp(req.headers);
   if (!rateLimit(`upsell:${ip}`, 20, 10 * 60_000)) return NextResponse.json({ error: "Muitas tentativas. Aguarde alguns minutos." }, { status: 429 });
   const body = (await req.json().catch(() => ({}))) as { pedido?: string; t?: string; upsellId?: string; action?: string };

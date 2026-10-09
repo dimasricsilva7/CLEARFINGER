@@ -25,6 +25,11 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: s.favicon_url || "/brand/favicon.png", apple: "/brand/apple-icon.png" },
     robots: index ? { index: true, follow: true } : { index: false, follow: false },
     formatDetection: { telephone: false },
+    // Verificação de domínio (Meta Business e Google Search Console) — códigos em Configurações → Tracking
+    verification: {
+      google: s.google_site_verification || undefined,
+      other: s.meta_domain_verification ? { "facebook-domain-verification": s.meta_domain_verification } : undefined,
+    },
   };
 }
 

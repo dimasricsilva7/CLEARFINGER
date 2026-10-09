@@ -13,7 +13,7 @@ O projeto reaproveita a base já em produção dos projetos **HAMA BEADS** (pedi
 | Banco | PostgreSQL (Neon) + Prisma 6 |
 | Pagamento | BravoPay (PIX) · Crediário próprio (sem gateway) |
 | Imagens | sharp → WebP guardado no Postgres, servido por `/media/[id].webp` com cache imutável de CDN |
-| Deploy | Vercel (região `iad1`), domínio `clearfinger.shop` com HTTPS (Let's Encrypt automático + HSTS), cron diário + GitHub Actions a cada 5 min |
+| Deploy | Vercel (região `iad1`), domínio `clearfingerbr.shop` com HTTPS (Let's Encrypt automático + HSTS), cron diário + GitHub Actions a cada 5 min |
 
 ## Estrutura
 
@@ -121,6 +121,16 @@ Admin → Anúncios e ROAS. `META_ADS_ACCESS_TOKEN` (ads_read) + IDs das contas.
 - **Google**: GA4, Google Ads e GTM — uma implementação de cada tag, IDs validados (sem scripts arbitrários).
 - **UTMs** (source, medium, campaign, content, term, `utm_id`/`campaign_id`, conjunto e anúncio, fbclid/gclid/ttclid) acompanham sessão, pedido (`Order` + `UtmData`), cobrança PIX (enviadas à BravoPay) e compra — verificados no E2E.
 - Aviso de cookies com aceitar / recusar / configurar (modelo de recusa, como no HAMA); não aparece no checkout.
+
+## Segurança
+
+- **Cabeçalhos**: CSP restrita, HSTS (2 anos), X-Frame-Options/frame-ancestors (sem iframe), nosniff, Referrer-Policy, Permissions-Policy, COOP.
+- **Borda (middleware)**: caminhos de varredura (`/wp-admin`, `/.env`, `/.git`, `*.php`…) respondem 404 sem tocar no app — `src/lib/security.ts`.
+- **Formulários de compra** (checkout, checkout abandonado, rastreio, upsell): mesma origem obrigatória, rate limit por IP, clientes de script (curl, python…) recusados em produção, campo isca + tempo mínimo de preenchimento no checkout.
+- **Anti-abuso de PIX** (persistente, no banco): no máximo 8 pedidos por IP em 15 min e 5 PIX em aberto por e-mail em 1 h.
+- **Admin**: bcrypt, sessão httpOnly de 12 h, bloqueio persistente após tentativas, papéis, auditoria; dados do crediário cifrados (AES-256-GCM).
+- **Firewall da Vercel** (complementar): regras de bloqueio de varreduras, limites no checkout/login, OWASP (SQLi, XSS, RCE, LFI/RFI, scanners) e bloqueio de robôs de IA — exige abrir a aba Firewall do projeto uma vez para a Vercel criar a configuração.
+- Robôs legítimos (Google, Meta, WhatsApp) veem o mesmo site que os clientes.
 
 ## Admin
 

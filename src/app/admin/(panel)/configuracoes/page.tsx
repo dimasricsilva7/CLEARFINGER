@@ -171,7 +171,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
               <p className="text-sm text-slate-600">Os e-mails saem pelo Resend com o remetente configurado em <code>EMAIL_FROM</code>. Respostas dos clientes vão para {s.contact_email || "o e-mail de atendimento"}.</p>
             ) : (
               <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                Para enviar de verdade, crie uma conta grátis em resend.com, verifique o domínio clearfinger.shop (registros DNS) e cadastre na Vercel: <code>RESEND_API_KEY</code> e <code>EMAIL_FROM</code> (ex.: <code>CLEARFINGER &lt;pedidos@clearfinger.shop&gt;</code>). Até lá os e-mails ficam registrados nos pedidos e saem assim que configurar.
+                Para enviar de verdade, crie uma conta grátis em resend.com, verifique o domínio clearfingerbr.shop (registros DNS) e cadastre na Vercel: <code>RESEND_API_KEY</code> e <code>EMAIL_FROM</code> (ex.: <code>CLEARFINGER &lt;pedidos@clearfingerbr.shop&gt;</code>). Até lá os e-mails ficam registrados nos pedidos e saem assim que configurar.
               </p>
             )}
             <ActionForm action={sendTestEmailAction} className="mt-4 grid gap-3 sm:grid-cols-[1fr_220px_auto] sm:items-end">
@@ -220,7 +220,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
       {tab === "rastreamento" && (
         <Card title="Tracking — Meta Pixel e Google">
           {form(
-            ["meta_pixel_enabled", "meta_pixel_id", "meta_capi_enabled", "ga_enabled", "ga_id", "gtm_id", "google_ads_id", "google_ads_purchase_label", "cookie_banner_enabled"],
+            ["meta_pixel_enabled", "meta_pixel_id", "meta_capi_enabled", "ga_enabled", "ga_id", "gtm_id", "google_ads_id", "google_ads_purchase_label", "cookie_banner_enabled", "meta_domain_verification", "google_site_verification"],
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 {text("meta_pixel_id", "Meta Pixel ID(s)", "Até 3, separados por vírgula. Vazio = NEXT_PUBLIC_META_PIXEL_ID")}
@@ -228,6 +228,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
                 {text("gtm_id", "Google Tag Manager", "GTM-XXXXXXX (opcional — não duplique tags que já estão aqui)")}
                 {text("google_ads_id", "Google Ads", "AW-123456789")}
                 {text("google_ads_purchase_label", "Rótulo da conversão de compra (Google Ads)")}
+                {text("meta_domain_verification", "Verificação de domínio da Meta", "Só o código do content da meta-tag facebook-domain-verification (Business → Segurança da marca → Domínios)")}
+                {text("google_site_verification", "Verificação do Google Search Console", "Só o código do content da meta-tag google-site-verification")}
               </div>
               {check("meta_pixel_enabled", "Meta Pixel ativo (PageView, ViewContent, InitiateCheckout, AddPaymentInfo, Purchase)")}
               {check("meta_capi_enabled", `Conversions API (servidor) — token: ${process.env.META_CAPI_TOKENS || process.env.META_ACCESS_TOKEN ? "configurado" : "NÃO configurado"}`)}

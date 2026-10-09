@@ -107,3 +107,19 @@ test("utilitários: canal e CPF", () => {
   assert.equal(isValidCpf("529.982.247-25"), true);
   assert.equal(isValidCpf("111.111.111-11"), false);
 });
+
+import { isScriptClient, looksLikeBotSubmission, SCANNER_PATH } from "../src/lib/security";
+
+test("segurança: varreduras, clientes de script e sinais de robô", () => {
+  for (const p of ["/wp-admin", "/wp-login.php", "/.env", "/.git/config", "/phpmyadmin", "/xmlrpc.php", "/index.php", "/backup.sql"]) assert.ok(SCANNER_PATH.test(p), p);
+  for (const p of ["/", "/checkout", "/rastrear-pedido", "/pedido/CF12345-2026", "/politica-de-privacidade", "/admin", "/media/abc.webp", "/.well-known/acme-challenge/x"]) assert.ok(!SCANNER_PATH.test(p), p);
+  assert.equal(isScriptClient("curl/8.4.0"), true);
+  assert.equal(isScriptClient("python-requests/2.31"), true);
+  assert.equal(isScriptClient(null), true);
+  assert.equal(isScriptClient("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"), false);
+  assert.equal(isScriptClient("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"), false);
+  assert.equal(looksLikeBotSubmission({ hp: "http://spam.example" }), true);
+  assert.equal(looksLikeBotSubmission({ hp: "", elapsedMs: 800 }), true);
+  assert.equal(looksLikeBotSubmission({ hp: "", elapsedMs: 45_000 }), false);
+  assert.equal(looksLikeBotSubmission({}), false);
+});

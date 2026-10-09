@@ -29,6 +29,8 @@ const VALIDATORS: Record<string, (v: string) => string | null> = {
   ads_fx_mode: (v) => (["ptax", "manual"].includes(v) ? null : "Modo de cotação inválido"),
   ads_fx_manual_rate: (v) => (!v || /^\d{1,2}([.,]\d{1,4})?$/.test(v) ? null : "Cotação manual inválida (ex.: 5,35)"),
   ads_fx_fee_pct: (v) => (/^\d{1,2}([.,]\d{1,2})?$/.test(v) ? null : "IOF/taxa inválido (ex.: 3,5)"),
+  meta_domain_verification: (v) => (!v || /^[A-Za-z0-9_-]{8,80}$/.test(v) ? null : "Código de verificação da Meta inválido (cole só o valor do content)"),
+  google_site_verification: (v) => (!v || /^[A-Za-z0-9_-]{8,100}$/.test(v) ? null : "Código do Google inválido (cole só o valor do content)"),
   tracking_holidays: (v) => (!v || v.split(/[\s,;]+/).filter(Boolean).every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) ? null : "Feriados: use datas no formato AAAA-MM-DD separadas por vírgula"),
   shipping_flat_cents: (v) => (/^\d{1,7}$/.test(v) ? null : "Frete inválido"),
   pix_expiration_minutes: intRange(5, 1440, "Validade do PIX entre 5 e 1440 minutos"),

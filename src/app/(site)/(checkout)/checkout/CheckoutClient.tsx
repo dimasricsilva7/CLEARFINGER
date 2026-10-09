@@ -84,6 +84,9 @@ export function CheckoutClient(p: CheckoutProps) {
   const [consent, setConsent] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const started = useRef(false);
+  // Anti-robô: campo isca invisível (pessoas não preenchem) e momento em que o formulário abriu
+  const honeypot = useRef<HTMLInputElement>(null);
+  const openedAt = useRef(Date.now());
 
   // Dados do formulário guardados apenas nesta aba (dados do crediário NUNCA são guardados)
   useEffect(() => {
@@ -269,6 +272,8 @@ export function CheckoutClient(p: CheckoutProps) {
         body: JSON.stringify({
           checkoutToken: token,
           leadKey: leadKey.current || undefined,
+          hp: honeypot.current?.value || undefined,
+          elapsedMs: Date.now() - openedAt.current,
           offerId: offer.id,
           quantity: 1,
           bumpIds,
@@ -364,6 +369,11 @@ export function CheckoutClient(p: CheckoutProps) {
 
   return (
     <form id="checkout-form" onSubmit={submit} noValidate className="container-page grid gap-5 pb-32 pt-5 sm:pt-8 lg:grid-cols-[1fr_400px] lg:items-start lg:gap-10 lg:pb-16">
+      {/* campo isca: fora da tela, sem foco nem preenchimento automático — só robôs preenchem */}
+      <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}>
+        <label htmlFor="cf-website">Site</label>
+        <input ref={honeypot} id="cf-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+      </div>
       <div className="space-y-5">
         <div>
           <h1 className="font-display text-[1.7rem] font-semibold tracking-tight text-navy sm:text-4xl">{p.title}</h1>

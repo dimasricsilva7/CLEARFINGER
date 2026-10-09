@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SCANNER_PATH } from "@/lib/security";
 
 const VID = "cf_vid";
 
@@ -16,6 +17,9 @@ function newVisitorId() {
  */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Varredura de vulnerabilidades (WordPress, .env, .git…): 404 na borda, sem tocar no app
+  if (SCANNER_PATH.test(pathname)) return new NextResponse(null, { status: 404, headers: { "Cache-Control": "public, max-age=3600" } });
 
   if (pathname.startsWith("/api/admin")) {
     if (!req.cookies.get("cf_admin")?.value) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
