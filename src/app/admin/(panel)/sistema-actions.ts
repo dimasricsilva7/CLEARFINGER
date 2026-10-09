@@ -26,6 +26,7 @@ const VALIDATORS: Record<string, (v: string) => string | null> = {
   email_recovery_delay_minutes: (v) => (/^\d{1,4}$/.test(v) && Number(v) >= 1 && Number(v) <= 1440 ? null : "Tempo do lembrete de PIX: de 1 a 1440 minutos"),
   email_checkout_delay_minutes: (v) => (/^\d{1,4}$/.test(v) && Number(v) >= 5 && Number(v) <= 1440 ? null : "Tempo do checkout abandonado: de 5 a 1440 minutos"),
   ads_account_ids: (v) => (!v || v.split(/[\s,;]+/).filter(Boolean).every((x) => /^(act_)?\d{5,20}$/.test(x)) ? null : "IDs de conta: só números (ex.: 1800271297818384), separados por vírgula"),
+  ads_campaign_filter: (v) => (v.length <= 200 ? null : "Filtro de campanhas muito longo"),
   ads_fx_mode: (v) => (["ptax", "manual"].includes(v) ? null : "Modo de cotação inválido"),
   ads_fx_manual_rate: (v) => (!v || /^\d{1,2}([.,]\d{1,4})?$/.test(v) ? null : "Cotação manual inválida (ex.: 5,35)"),
   ads_fx_fee_pct: (v) => (/^\d{1,2}([.,]\d{1,2})?$/.test(v) ? null : "IOF/taxa inválido (ex.: 3,5)"),

@@ -124,9 +124,12 @@ export default async function AdsPage({ searchParams }: { searchParams: SP }) {
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card title="Conexão e conversão" actions={r.connected ? <Badge tone="green">conectado</Badge> : <Badge tone="amber">não conectado</Badge>}>
           <ActionForm action={saveSettings} className="space-y-4">
-            <input type="hidden" name="__keys" value="ads_account_ids,ads_fx_mode,ads_fx_manual_rate,ads_fx_fee_pct" />
+            <input type="hidden" name="__keys" value="ads_account_ids,ads_campaign_filter,ads_fx_mode,ads_fx_manual_rate,ads_fx_fee_pct" />
             <Field label="IDs das contas de anúncios (Meta)" hint="Só números, separados por vírgula. Ex.: 1800271297818384, 2608047479647175">
               <input name="ads_account_ids" defaultValue={s.ads_account_ids} className={inputCls} />
+            </Field>
+            <Field label="Considerar só campanhas com estas palavras no nome" hint="Ex.: CLEARFINGER. Separe por vírgula. Vazio = todas as campanhas da conta (inclusive de outras lojas).">
+              <input name="ads_campaign_filter" defaultValue={s.ads_campaign_filter} placeholder="CLEARFINGER" className={inputCls} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Cotação do dólar">

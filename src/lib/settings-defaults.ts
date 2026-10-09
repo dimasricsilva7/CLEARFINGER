@@ -37,6 +37,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   google_site_verification: "",
   // Anúncios (Admin → Anúncios e ROAS)
   ads_account_ids: "",
+  ads_campaign_filter: "",
   ads_fx_mode: "ptax",
   ads_fx_manual_rate: "",
   ads_fx_fee_pct: "3.5",

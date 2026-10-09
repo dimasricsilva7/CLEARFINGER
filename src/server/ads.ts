@@ -117,18 +117,44 @@ export async function syncFxRates(since: string, until: string) {
   const url =
     "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)" +
     `?@dataInicial='${fmt(start)}'&@dataFinalCotacao='${fmt(until)}'&$top=1000&$format=json&$select=cotacaoVenda,dataHoraCotacao`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`PTAX HTTP ${res.status}`);
-  const json = (await res.json()) as { value?: { cotacaoVenda: number; dataHoraCotacao: string }[] };
-  const byDay = new Map((json.value ?? []).map((v) => [v.dataHoraCotacao.slice(0, 10), v.cotacaoVenda]));
+  let byDay = new Map<string, number>();
+  let source = "bcb_ptax";
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`PTAX HTTP ${res.status}`);
+    const json = (await res.json()) as { value?: { cotacaoVenda: number; dataHoraCotacao: string }[] };
+    byDay = new Map((json.value ?? []).map((v) => [v.dataHoraCotacao.slice(0, 10), v.cotacaoVenda]));
+  } catch (err) {
+    log.warn("ads", "PTAX indisponível, usando cotação reserva", { error: err instanceof Error ? err.message : String(err) });
+  }
+  // Reserva: o Banco Central às vezes recusa acessos de servidores fora do Brasil
+  if (!byDay.size) {
+    const days = Math.min(360, Math.ceil((Date.parse(until) - Date.parse(start)) / 86_400_000) + 3);
+    const res = await fetch(`https://economia.awesomeapi.com.br/json/daily/USD-BRL/${days}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Cotação reserva HTTP ${res.status}`);
+    const list = (await res.json()) as { ask: string; timestamp: string }[];
+    byDay = new Map(list.map((v) => [spDate(new Date(Number(v.timestamp) * 1000)), Number(v.ask)]).filter(([, r]) => Number.isFinite(r as number) && (r as number) > 0) as [string, number][]);
+    source = "awesomeapi";
+  }
   let last: number | null = null;
   for (let d = start; d <= until; d = addDays(d, 1)) {
     if (byDay.has(d)) last = byDay.get(d)!;
-    if (last && d >= since) await db.fxRate.upsert({ where: { date: d }, update: { usdBrl: last }, create: { date: d, usdBrl: last } });
+    if (last && d >= since) await db.fxRate.upsert({ where: { date: d }, update: { usdBrl: last, source }, create: { date: d, usdBrl: last, source } });
   }
 }
 
-export type FxConfig = { mode: "ptax" | "manual"; manualRate: number; feePct: number };
+/** Só campanhas cujo nome contém uma das palavras (a conta pode ter campanhas de outras lojas). Vazio = todas. */
+export const campaignKeywords = (s: Settings) =>
+  (s.ads_campaign_filter ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+function campaignFilter(s: Settings) {
+  const kw = campaignKeywords(s);
+  return kw.length ? { OR: kw.map((k) => ({ campaignName: { contains: k, mode: "insensitive" as const } })) } : {};
+}
+
+export type FxConfig ={ mode: "ptax" | "manual"; manualRate: number; feePct: number };
 export function fxConfig(s: Settings): FxConfig {
   const n = (v: string | undefined, f: number) => {
     const x = Number(String(v ?? "").replace(",", "."));
@@ -144,7 +170,7 @@ export async function adsReport(from: Date, to: Date) {
   const sinceDay = spDate(from);
   const untilDay = spDate(new Date(to.getTime() - 1));
   const [spend, rates, orders] = await Promise.all([
-    db.adSpendDaily.findMany({ where: { date: { gte: sinceDay, lte: untilDay } } }),
+    db.adSpendDaily.findMany({ where: { date: { gte: sinceDay, lte: untilDay }, ...campaignFilter(s) } }),
     db.fxRate.findMany({ where: { date: { gte: addDays(sinceDay, -7), lte: untilDay } }, orderBy: { date: "asc" } }),
     db.order.findMany({
       where: { status: { in: [...PAID_STATUSES] }, OR: [{ paidAt: { gte: from, lt: to } }, { paidAt: null, approvedAt: { gte: from, lt: to } }] },
