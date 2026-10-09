@@ -4,16 +4,19 @@ import { ActionForm, SubmitButton } from "@/components/admin/client";
 import { ImageField } from "@/components/admin/inputs";
 import { bravopayMode, envHealth, siteUrl } from "@/lib/env";
 import { getSettingsFresh } from "@/server/settings";
-import { saveSettings } from "../sistema-actions";
+import { saveSettings, sendTestEmailAction } from "../sistema-actions";
+import { renderPreview } from "@/lib/email";
+import { emailProvider } from "@/lib/email/provider";
 
 export const metadata = { title: "Configurações" };
 type SP = Promise<{ aba?: string }>;
 
-const TABS = { marca: "Marca", empresa: "Empresa e contato", aparencia: "Aparência e layout", checkout: "Checkout", entrega: "Entrega", rastreamento: "Tracking (Meta / Google)", seo: "SEO", politicas: "Políticas", sistema: "Sistema" } as const;
+const TABS = { marca: "Marca", empresa: "Empresa e contato", aparencia: "Aparência e layout", checkout: "Checkout", entrega: "Entrega", emails: "E-mails", rastreamento: "Tracking (Meta / Google)", seo: "SEO", politicas: "Políticas", sistema: "Sistema" } as const;
 
 export default async function SettingsPage({ searchParams }: { searchParams: SP }) {
   const tab = ((await searchParams).aba ?? "marca") as keyof typeof TABS;
   const s = await getSettingsFresh();
+  const previews = tab === "emails" ? { confirmation: await renderPreview("confirmation", s), recovery: await renderPreview("recovery", s), checkout: await renderPreview("checkout", s) } : { confirmation: { html: "" }, recovery: { html: "" }, checkout: { html: "" } };
   const text = (key: string, label: string, hint?: string, placeholder?: string) => (
     <Field label={label} hint={hint}><input name={key} defaultValue={s[key]} placeholder={placeholder} className={inputCls} /></Field>
   );
@@ -158,6 +161,59 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
               </>
             )}
           </Card>
+        </div>
+      )}
+
+      {tab === "emails" && (
+        <div className="space-y-6">
+          <Card title="Envio" actions={emailProvider() === "resend" ? <Badge tone="green">Resend conectado</Badge> : <Badge tone="amber">não configurado</Badge>}>
+            {emailProvider() === "resend" ? (
+              <p className="text-sm text-slate-600">Os e-mails saem pelo Resend com o remetente configurado em <code>EMAIL_FROM</code>. Respostas dos clientes vão para {s.contact_email || "o e-mail de atendimento"}.</p>
+            ) : (
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Para enviar de verdade, crie uma conta grátis em resend.com, verifique o domínio clearfinger.shop (registros DNS) e cadastre na Vercel: <code>RESEND_API_KEY</code> e <code>EMAIL_FROM</code> (ex.: <code>CLEARFINGER &lt;pedidos@clearfinger.shop&gt;</code>). Até lá os e-mails ficam registrados nos pedidos e saem assim que configurar.
+              </p>
+            )}
+            <ActionForm action={sendTestEmailAction} className="mt-4 grid gap-3 sm:grid-cols-[1fr_220px_auto] sm:items-end">
+              <Field label="Enviar e-mail de teste para"><input name="to" type="email" defaultValue={s.contact_email} className={inputCls} /></Field>
+              <Field label="Modelo">
+                <select name="kind" className={inputCls}>
+                  <option value="confirmation">Confirmação de compra</option>
+                  <option value="recovery">PIX pendente</option>
+                  <option value="checkout">Checkout abandonado</option>
+                </select>
+              </Field>
+              <SubmitButton pendingText="Enviando…">Enviar teste</SubmitButton>
+            </ActionForm>
+          </Card>
+          {(
+            [
+              ["confirmation", "Confirmação de compra", "Enviado na hora em que o PIX é confirmado ou o crediário é aprovado.", null],
+              ["recovery", "PIX gerado e não pago", "Lembrete com o código PIX e o link do pedido. Cancelado automaticamente se o cliente pagar antes.", "email_recovery_delay_minutes"],
+              ["checkout", "Checkout abandonado", "Para quem preencheu e-mail no checkout e saiu sem gerar o pedido. Leva de volta ao checkout com kit e dados preenchidos.", "email_checkout_delay_minutes"],
+            ] as const
+          ).map(([k, label, hint, delayKey]) => (
+            <Card key={k} title={label}>
+              <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+                {form(
+                  [`email_${k}_enabled`, `email_${k}_subject`, `email_${k}_title`, `email_${k}_text`, `email_${k}_button`, ...(delayKey ? [delayKey] : [])],
+                  <>
+                    <p className="text-sm text-slate-500">{hint} Use <code>{"{nome}"}</code> e <code>{"{pedido}"}</code> nos textos.</p>
+                    {check(`email_${k}_enabled`, "Envio automático ativado")}
+                    {delayKey && <Field label="Enviar depois de (minutos)"><input name={delayKey} type="number" min={1} defaultValue={s[delayKey]} className={`${inputCls} max-w-[160px]`} /></Field>}
+                    {text(`email_${k}_subject`, "Assunto")}
+                    {text(`email_${k}_title`, "Título")}
+                    <Field label="Texto"><textarea name={`email_${k}_text`} rows={4} defaultValue={s[`email_${k}_text`]} className={textareaCls} /></Field>
+                    {text(`email_${k}_button`, "Texto do botão")}
+                  </>
+                )}
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Prévia (dados de exemplo)</p>
+                  <iframe title={`Prévia — ${label}`} srcDoc={previews[k].html} sandbox="" className="h-[640px] w-full rounded-lg border border-slate-200 bg-white" />
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 # Reconciliação de PIX pendentes, expiração e reprocessamento de webhooks a cada 5 min.
 # Complementa o Vercel Cron (diário no plano Hobby). Secrets do repositório:
-#   SITE_URL    → ex.: https://clearfinger.vercel.app
+#   SITE_URL    → https://clearfinger.shop
 #   CRON_SECRET → mesmo valor da variável CRON_SECRET na Vercel
 name: jobs
 on:

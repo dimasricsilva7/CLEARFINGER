@@ -123,6 +123,9 @@ export const TRACKED_EVENTS = [
   "tracking_order_found",
   "tracking_order_not_found",
   "tracking_status_viewed",
+  "email_recovery_sent",
+  "email_confirmation_sent",
+  "checkout_lead_captured",
   "cookie_consent",
 ] as const;
 export type TrackedEvent = (typeof TRACKED_EVENTS)[number];

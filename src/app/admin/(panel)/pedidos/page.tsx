@@ -6,11 +6,12 @@ import { PeriodFilter } from "@/components/admin/PeriodFilter";
 import { RowActions } from "@/components/admin/RowActions";
 import { CREDIARIO_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PIX_STATUSES } from "@/lib/domain";
 import { db } from "@/lib/db";
+import { isPaidStatus } from "@/lib/domain";
 import { decryptField } from "@/lib/crypto";
 import { formatProtocol } from "@/lib/crediario";
 import { formatBRL, formatDate, formatPhone } from "@/utils/format";
 import { resolvePeriod } from "@/server/admin/period";
-import { deleteOrder } from "./actions";
+import { deleteOrder, quickResendEmail } from "./actions";
 
 export const metadata = { title: "Pedidos" };
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -105,7 +106,23 @@ export default async function OrdersPage({ searchParams }: { searchParams: SP })
           { key: "s", label: "Status", render: (o) => <Badge tone={ORDER_TONE[o.status] ?? "slate"}>{ORDER_STATUS_LABEL[o.status]}</Badge> },
           { key: "o", label: "Origem", render: (o) => o.utmSource ?? o.channel ?? "—" },
           { key: "cp", label: "Campanha", render: (o) => <span className="block max-w-[160px] truncate">{o.utmCampaign ?? "—"}</span> },
-          { key: "a", label: "", render: (o) => <RowActions id={o.id} onDelete={deleteOrder} deleteConfirm={`Excluir o pedido ${o.orderNumber} definitivamente?`} /> },
+          {
+            key: "a",
+            label: "",
+            render: (o) => {
+              const unpaidPix = o.paymentMethod === "PIX" && ["PENDING", "PIX_GENERATED", "EXPIRED", "FAILED"].includes(o.status);
+              const paid = isPaidStatus(o.status);
+              return (
+                <RowActions
+                  id={o.id}
+                  primary={unpaidPix || paid ? quickResendEmail : undefined}
+                  primaryLabel={unpaidPix ? "Reenviar PIX por e-mail" : "Reenviar confirmação"}
+                  onDelete={deleteOrder}
+                  deleteConfirm={`Excluir o pedido ${o.orderNumber} definitivamente?`}
+                />
+              );
+            },
+          },
         ]}
       />
       <Pagination page={page} pages={Math.ceil(count / PER_PAGE)} makeHref={(pg) => `?${qs({ page: String(pg) })}`} />

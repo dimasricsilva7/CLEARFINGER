@@ -74,6 +74,8 @@ export const crediarioSchema = z.object({
 
 export const checkoutSchema = z.object({
   checkoutToken: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/),
+  /** Chave do checkout em andamento (liga o pedido ao checkout abandonado) */
+  leadKey: z.string().min(16).max(64).optional(),
   offerId: idSchema,
   quantity: z.number().int().min(1).max(5).default(1),
   bumpIds: z.array(idSchema).max(5).default([]),

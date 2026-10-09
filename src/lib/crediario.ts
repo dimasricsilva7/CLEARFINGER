@@ -10,6 +10,8 @@ export type ValidityFormat = (typeof VALIDITY_FORMATS)[number];
 export type CrediarioConfig = {
   enabled: boolean;
   methodLabel: string;
+  /** Linha abaixo do nome do método no checkout ({parcelas} = máximo de parcelas) */
+  methodSubtitle: string;
   sectionTitle: string;
   description: string;
   protocolLabel: string;
@@ -53,6 +55,7 @@ export function crediarioConfig(s: Record<string, string>): CrediarioConfig {
   return {
     enabled: s.crediario_enabled === "true",
     methodLabel: s.crediario_method_label || "Crediário",
+    methodSubtitle: (s.crediario_method_subtitle ?? "").replaceAll("{parcelas}", String(clampInt(s.crediario_max_installments, 1, 24, 2))),
     sectionTitle: s.crediario_section_title ?? "",
     description: s.crediario_description ?? "",
     protocolLabel: s.crediario_protocol_label || "Número do protocolo",

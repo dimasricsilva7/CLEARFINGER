@@ -15,6 +15,8 @@ import { handleBravopayWebhook } from "@/server/webhooks";
 import { syncOrderTracking } from "@/server/delivery";
 import { getSettingsFresh } from "@/server/settings";
 import { stageDefs, zonedTime } from "@/lib/delivery";
+import type { EmailType } from "@prisma/client";
+import { EMAIL_TYPE_LABEL, resendEmail } from "@/lib/email";
 
 /** Entrega — só para pedidos com venda confirmada (PIX pago ou crediário aprovado/concluído). */
 export async function updateFulfillment(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -175,5 +177,41 @@ export async function toggleTrackingEvent(_: ActionResult, fd: FormData): Promis
     await audit(admin.id, "order_tracking_toggled", "order", ev.orderId, { summary: `Evento de rastreio "${ev.title}" ${updated.hidden ? "ocultado" : "reexibido"}` });
     revalidatePath(`/admin/pedidos/${ev.orderId}`);
     return { ok: true, message: updated.hidden ? "Evento ocultado para o cliente." : "Evento visível novamente." };
+  });
+}
+
+// ───────────── E-mails do pedido ─────────────
+
+/** Tipo de e-mail que faz sentido para o pedido agora: confirmação (pago/aprovado) ou lembrete de PIX (não pago). */
+function emailTypeFor(o: { status: string; paymentMethod: string }): EmailType | null {
+  if (isPaidStatus(o.status)) return "PURCHASE_CONFIRMATION";
+  if (o.paymentMethod === "PIX" && (isAwaitingPix(o.status) || o.status === "EXPIRED" || o.status === "FAILED")) return "PIX_RECOVERY";
+  return null;
+}
+
+export async function resendEmailAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("EDITOR", async (admin) => {
+    const id = str(fd, "id", 40);
+    const type = str(fd, "type", 40) as EmailType;
+    if (!(type in EMAIL_TYPE_LABEL)) return { error: "Tipo de e-mail inválido." };
+    const order = await db.order.findUniqueOrThrow({ where: { id }, include: { customer: { select: { email: true } } } });
+    const r = await resendEmail(id, type, admin.id);
+    await audit(admin.id, "email_resent", "order", id, { summary: `${EMAIL_TYPE_LABEL[type]} — pedido ${order.orderNumber} para ${order.customer.email}: ${r.ok ? "enviado" : r.error}` });
+    revalidatePath(`/admin/pedidos/${id}`);
+    return r.ok ? { ok: true, message: `${EMAIL_TYPE_LABEL[type]} enviado para ${order.customer.email}.` } : { error: r.error };
+  });
+}
+
+/** Botão da lista: reenvia o e-mail adequado ao status (lembrete de PIX para não pagos, confirmação para pagos). */
+export async function quickResendEmail(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withAdmin("EDITOR", async (admin) => {
+    const id = str(fd, "id", 40);
+    const order = await db.order.findUniqueOrThrow({ where: { id }, include: { customer: { select: { email: true } } } });
+    const type = emailTypeFor(order);
+    if (!type) return { error: "Este pedido não tem e-mail para reenviar no status atual." };
+    const r = await resendEmail(id, type, admin.id);
+    await audit(admin.id, "email_resent", "order", id, { summary: `${EMAIL_TYPE_LABEL[type]} — pedido ${order.orderNumber} para ${order.customer.email}: ${r.ok ? "enviado" : r.error}` });
+    revalidatePath("/admin/pedidos");
+    return r.ok ? { ok: true, message: `${EMAIL_TYPE_LABEL[type]} enviado para ${order.customer.email}.` } : { error: r.error };
   });
 }

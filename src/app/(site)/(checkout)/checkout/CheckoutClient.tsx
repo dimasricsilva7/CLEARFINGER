@@ -17,6 +17,7 @@ type Form = { name: string; email: string; phone: string; cpf: string; cep: stri
 const EMPTY: Form = { name: "", email: "", phone: "", cpf: "", cep: "", street: "", number: "", complement: "", district: "", city: "", state: "" };
 const FORM_KEY = "cf_checkout_form";
 const TOKEN_KEY = "cf_checkout_token";
+const LEAD_KEY = "cf_checkout_lead";
 
 export type CheckoutProps = {
   productId: string;
@@ -37,8 +38,10 @@ export type CheckoutProps = {
   consentLabel: string;
   title: string;
   securityText: string;
-  pix: { enabled: boolean; label: string; description: string; button: string };
+  pix: { enabled: boolean; label: string; badge: string; description: string; button: string };
   crediario: CrediarioConfig;
+  /** Checkout restaurado pelo link do e-mail de checkout abandonado */
+  recovered?: { clientKey: string; name: string | null; email: string | null; phone: string | null; bumpIds: string[] } | null;
 };
 
 function Field({ id, label, error, children, className = "" }: { id: string; label: string; error?: string; children: React.ReactNode; className?: string }) {
@@ -66,7 +69,7 @@ export function CheckoutClient(p: CheckoutProps) {
   const router = useRouter();
   const [offerId, setOfferId] = useState(p.initialOfferId);
   const offer = p.offers.find((o) => o.id === offerId) ?? p.offers[0];
-  const [bumpIds, setBumpIds] = useState<string[]>([]);
+  const [bumpIds, setBumpIds] = useState<string[]>(() => (p.recovered?.bumpIds ?? []).filter((id) => p.bumps.some((b) => b.id === id)));
   const chosenBumps = p.bumps.filter((b) => bumpIds.includes(b.id));
   const kitImg = kitVisual(offer.imageUrl, p.imageUrl, offer.quantity);
   const totalCents = offer.priceCents + chosenBumps.reduce((s, b) => s + b.priceCents, 0) + p.shippingCents;
@@ -86,11 +89,58 @@ export function CheckoutClient(p: CheckoutProps) {
   useEffect(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(FORM_KEY) ?? "null");
-      if (saved) setForm({ ...EMPTY, ...saved });
+      const r = p.recovered;
+      if (r) setForm((f) => ({ ...f, ...(saved ?? {}), name: r.name ?? saved?.name ?? "", email: r.email ?? saved?.email ?? "", phone: r.phone ? maskPhone(r.phone) : saved?.phone ?? "" }));
+      else if (saved) setForm({ ...EMPTY, ...saved });
     } catch {
       /* ignore */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Checkout abandonado: guarda o contato (nome, e-mail, WhatsApp) e o kit escolhido enquanto a pessoa preenche,
+  // para enviar o lembrete se ela sair sem finalizar. Nunca envia CPF, endereço ou dados do crediário.
+  const leadKey = useRef<string>("");
+  useEffect(() => {
+    try {
+      leadKey.current = p.recovered?.clientKey ?? localStorage.getItem(LEAD_KEY) ?? "";
+      if (!leadKey.current) leadKey.current = randomId(32);
+      localStorage.setItem(LEAD_KEY, leadKey.current);
+    } catch {
+      leadKey.current = leadKey.current || randomId(32);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const email = form.email.trim();
+    const phone = onlyDigits(form.phone);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) && phone.length < 10) return;
+    const timer = setTimeout(() => {
+      const ctx = getClientContext();
+      fetch("/api/checkout/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          clientKey: leadKey.current,
+          name: form.name || undefined,
+          email: email || undefined,
+          phone: phone || undefined,
+          offerId: offer.id,
+          bumpIds,
+          paymentMethod: method ?? undefined,
+          sessionId: ctx.sessionId ?? undefined,
+          visitorId: ctx.visitorId ?? undefined,
+          utmSource: ctx.attribution?.last?.source ?? ctx.attribution?.first?.source ?? undefined,
+          utmCampaign: ctx.attribution?.last?.campaign ?? ctx.attribution?.first?.campaign ?? undefined,
+        }),
+      })
+        .then((r) => r.ok && trackOnce("checkout_lead", "checkout_lead_captured", { offerId: offer.id, valueCents: totalCents }))
+        .catch(() => {});
+    }, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.name, form.email, form.phone, offer.id, bumpIds, method]);
   useEffect(() => {
     try {
       sessionStorage.setItem(FORM_KEY, JSON.stringify(form));
@@ -218,6 +268,7 @@ export function CheckoutClient(p: CheckoutProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           checkoutToken: token,
+          leadKey: leadKey.current || undefined,
           offerId: offer.id,
           quantity: 1,
           bumpIds,
@@ -390,6 +441,7 @@ export function CheckoutClient(p: CheckoutProps) {
             </Field>
             <Field id="email" label="E-mail" error={errors.email}>
               <input id="email" type="email" value={form.email} onChange={(e) => set("email", e.target.value.trim())} autoComplete="email" inputMode="email" className="input" {...inv("email")} />
+              {!errors.email && <p className="mt-1 text-xs text-muted">Enviamos a confirmação e os avisos deste pedido para este e-mail.</p>}
             </Field>
           </div>
           {p.requireCpf && (
@@ -486,7 +538,7 @@ export function CheckoutClient(p: CheckoutProps) {
                 <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${method === "PIX" ? "border-primary" : "border-line"}`}>{method === "PIX" && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}</span>
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#32BCAD]/10 text-[#1a9e91]"><Icon name="pix" className="h-6 w-6" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2 font-semibold text-navy">{p.pix.label}<span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">aprovação imediata</span></span>
+                  <span className="flex flex-wrap items-center gap-2 font-semibold text-navy">{p.pix.label}{p.pix.badge && <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">{p.pix.badge}</span>}</span>
                   <span className="block text-[13px] text-muted">{p.pix.description}</span>
                 </span>
               </button>
@@ -497,7 +549,7 @@ export function CheckoutClient(p: CheckoutProps) {
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon name="box" className="h-6 w-6" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-navy">{p.crediario.methodLabel}</span>
-                  <span className="block text-[13px] text-muted">{p.crediario.maxInstallments > 1 ? `Em até ${p.crediario.maxInstallments}x · ` : ""}com o protocolo do seu crediário</span>
+                  {p.crediario.methodSubtitle && <span className="block text-[13px] text-muted">{p.crediario.methodSubtitle}</span>}
                 </span>
               </button>
             )}

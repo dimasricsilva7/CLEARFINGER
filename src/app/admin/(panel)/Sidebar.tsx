@@ -19,6 +19,7 @@ const GROUPS: { title: string; items: { href: string; label: string; owner?: boo
     title: "Vendas",
     items: [
       { href: "/admin/pedidos", label: "Pedidos" },
+      { href: "/admin/checkouts", label: "Checkouts abandonados" },
       { href: "/admin/clientes", label: "Clientes" },
     ],
   },

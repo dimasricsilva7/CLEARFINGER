@@ -10,7 +10,7 @@ export const metadata = { title: "Pagamentos" };
 export default async function PaymentsPage() {
   const s = await getSettingsFresh();
   const mode = bravopayMode();
-  const keys = ["pix_enabled", "pix_method_label", "pix_description", "pix_button_label", "pix_expiration_minutes"];
+  const keys = ["pix_enabled", "pix_method_label", "pix_badge", "pix_description", "pix_button_label", "pix_expiration_minutes"];
   return (
     <div className="space-y-6">
       <PageHeader
@@ -41,6 +41,7 @@ export default async function PaymentsPage() {
           <label className="flex items-center gap-2 text-sm font-medium md:col-span-2"><input type="checkbox" name="pix_enabled" defaultChecked={s.pix_enabled === "true"} className="h-4 w-4" /> PIX ativo no checkout</label>
           <Field label="Nome do método"><input name="pix_method_label" defaultValue={s.pix_method_label} className={inputCls} /></Field>
           <Field label="Texto do botão"><input name="pix_button_label" defaultValue={s.pix_button_label} className={inputCls} /></Field>
+          <Field label="Selo ao lado do nome" hint="Ex.: aprovação imediata (vazio = sem selo)"><input name="pix_badge" defaultValue={s.pix_badge} className={inputCls} /></Field>
           <Field label="Descrição" className="md:col-span-2"><textarea name="pix_description" rows={2} defaultValue={s.pix_description} className={textareaCls} /></Field>
           <Field label="Validade do PIX (minutos)"><input name="pix_expiration_minutes" inputMode="numeric" defaultValue={s.pix_expiration_minutes} className={inputCls} /></Field>
           <div className="md:col-span-2"><SubmitButton>Salvar PIX</SubmitButton></div>

@@ -9,7 +9,9 @@ import { decryptField } from "@/lib/crypto";
 import { formatProtocol } from "@/lib/crediario";
 import { db } from "@/lib/db";
 import { formatBRL, formatCep, formatCpf, formatDate, formatPhone } from "@/utils/format";
-import { addTrackingEvent, cancelOrder, deleteOrder, recheckPayment, setCrediarioStatus, simulatePayment, toggleTrackingEvent, updateFulfillment } from "../actions";
+import { EMAIL_STATUS_LABEL, EMAIL_TYPE_LABEL } from "@/lib/email";
+import { emailProvider } from "@/lib/email/provider";
+import { resendEmailAction, addTrackingEvent, cancelOrder, deleteOrder, recheckPayment, setCrediarioStatus, simulatePayment, toggleTrackingEvent, updateFulfillment } from "../actions";
 import { stageDefs } from "@/lib/delivery";
 import { syncOrderTracking } from "@/server/delivery";
 import { getSettingsFresh } from "@/server/settings";
@@ -27,7 +29,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const order = await db.order.findUnique({
     where: { id },
-    include: { customer: true, items: true, payments: true, paymentEvents: { orderBy: { createdAt: "asc" } }, crediario: true, utm: true },
+    include: { customer: true, items: true, payments: true, paymentEvents: { orderBy: { createdAt: "asc" } }, crediario: true, utm: true, emailEvents: { orderBy: { createdAt: "desc" } } },
   });
   if (!order) notFound();
   const settings = await getSettingsFresh();
@@ -167,6 +169,51 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </details>
             </Card>
           )}
+
+          <Card title={`E-mails (${order.emailEvents.length})`}>
+            {emailProvider() === "none" && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Envio de e-mails ainda não configurado (RESEND_API_KEY e EMAIL_FROM na Vercel). Os e-mails ficam registrados e saem assim que configurar.</p>}
+            {order.emailEvents.length ? (
+              <ul className="space-y-2 text-sm">
+                {order.emailEvents.map((e) => (
+                  <li key={e.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg border border-slate-200 p-2.5">
+                    <span className="w-32 shrink-0 text-xs text-slate-500">{formatDate(e.sentAt ?? e.scheduledFor, true)}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">
+                        {EMAIL_TYPE_LABEL[e.type]}{" "}
+                        <Badge tone={e.status === "SENT" ? "green" : e.status === "FAILED" ? "red" : e.status === "SCHEDULED" || e.status === "SENDING" ? "amber" : "slate"}>{EMAIL_STATUS_LABEL[e.status]}</Badge>{" "}
+                        {e.triggeredBy !== "system" && <Badge tone="blue">manual</Badge>}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        para {e.toEmail}
+                        {e.status === "SCHEDULED" ? ` · agendado para ${formatDate(e.scheduledFor, true)}` : ""}
+                        {e.attempts > 1 ? ` · ${e.attempts} tentativas` : ""}
+                      </p>
+                      {e.error && e.status !== "SENT" && <p className="text-xs text-slate-400">{e.error}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">Nenhum e-mail registrado para este pedido ainda.</p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              {isPix && ["PENDING", "PIX_GENERATED", "EXPIRED", "FAILED"].includes(order.status) && (
+                <ActionForm action={resendEmailAction}>
+                  <input type="hidden" name="id" value={order.id} />
+                  <input type="hidden" name="type" value="PIX_RECOVERY" />
+                  <SubmitButton pendingText="Enviando…">Reenviar e-mail do PIX</SubmitButton>
+                </ActionForm>
+              )}
+              {isPaidStatus(order.status) && (
+                <ActionForm action={resendEmailAction}>
+                  <input type="hidden" name="id" value={order.id} />
+                  <input type="hidden" name="type" value="PURCHASE_CONFIRMATION" />
+                  <SubmitButton pendingText="Enviando…">Reenviar confirmação de compra</SubmitButton>
+                </ActionForm>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Para {order.customer.email}. O e-mail do PIX leva à página do pedido; se o código venceu, o cliente gera um novo em 1 toque.</p>
+          </Card>
 
           <Card title="Histórico do pedido">
             <ol className="space-y-2 text-sm">

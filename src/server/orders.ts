@@ -15,6 +15,8 @@ import { linkSessionToCustomer, trackServerEvent } from "@/lib/analytics";
 import { sendCapiEvent, fbcFromClickId } from "@/lib/meta/capi";
 import { findSellableOffer } from "@/server/catalog";
 import { publicTimeline, syncOrderTracking } from "@/server/delivery";
+import { onOrderPaidEmail, onPixGeneratedEmail } from "@/lib/email";
+import { linkLeadToOrder } from "@/server/checkout-leads";
 import { getSettingsFresh, isOn, settingInt, shippingCentsFrom } from "@/server/settings";
 import type { CheckoutInput } from "@/lib/validation";
 import type { ClientContext } from "@/types/tracking";
@@ -248,6 +250,7 @@ export async function createCheckoutOrder(input: CheckoutInput, meta: RequestMet
   });
   log.info("checkout", "pedido criado", { order: order.orderNumber, method, total: order.totalCents, channel: order.channel });
   await linkSessionToCustomer(order.sessionId, order.customerId);
+  await linkLeadToOrder(input.leadKey, order.id, input.customer.email);
   await trackServerEvent(order, "order_created", { valueCents: order.totalCents, productId: offer.productId, offerId: offer.id, props: { method } });
 
   let result = order;
@@ -340,6 +343,8 @@ export async function ensurePix(orderId: string): Promise<Order> {
       await logOrderEvent(order.id, "payment_response", "PIX gerado", { transaction_id: charge.transactionId, status: charge.status, expires_at: charge.expiresAt }, "PIX_GENERATED");
       await trackServerEvent(order, "pix_generated", { valueCents: order.totalCents, productId: main?.productId, offerId: main?.offerId });
       await trackServerEvent(order, "payment_pending", { valueCents: order.totalCents });
+      // lembrete por e-mail se o PIX não for pago (padrão 10 min; cancelado ao pagar)
+      await onPixGeneratedEmail(order.id, order.customer.email).catch((e) => log.error("email", "falha ao agendar lembrete", { order: order.orderNumber, error: e instanceof Error ? e.message : String(e) }));
     }
     return db.order.findUniqueOrThrow({ where: { id: order.id } });
   } catch (err) {
@@ -452,6 +457,9 @@ async function onConfirmed(orderId: string) {
 
   const tracked = await db.order.updateMany({ where: { id: order.id, purchaseTrackedAt: null }, data: { purchaseTrackedAt: new Date() } });
   if (!tracked.count) return;
+
+  // confirmação de compra por e-mail (e cancela o lembrete de PIX)
+  await onOrderPaidEmail(order.id, order.customer.email).catch((e) => log.error("email", "falha na confirmação", { order: order.orderNumber, error: e instanceof Error ? e.message : String(e) }));
 
   // etapa 1 da linha do tempo de entrega ("Pagamento concluído") na hora da confirmação
   await syncOrderTracking(order).catch((e) => log.error("tracking", "falha ao iniciar linha do tempo", { order: order.id, error: e instanceof Error ? e.message : String(e) }));

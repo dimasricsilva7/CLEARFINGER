@@ -4,6 +4,7 @@ import { log } from "@/lib/log";
 import { reconcilePendingOrders } from "@/server/orders";
 import { retryFailedWebhooks } from "@/server/webhooks";
 import { syncDueTracking } from "@/server/delivery";
+import { processDueEmails } from "@/lib/email";
 
 /** Trava distribuída simples via banco — evita dois processadores simultâneos. */
 async function withLock<T>(name: string, ttlMs: number, fn: () => Promise<T>): Promise<T | { skipped: true }> {
@@ -27,6 +28,7 @@ export async function runReconcileJobs() {
     reconcile: await reconcilePendingOrders(20),
     webhooks: await retryFailedWebhooks(10),
     tracking: await syncDueTracking(),
+    emails: await processDueEmails(),
   }));
 }
 

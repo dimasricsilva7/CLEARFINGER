@@ -134,6 +134,15 @@ async function run() {
   await page.goto(pixUrl);
   ok(await page.getByRole("heading", { name: /Pagamento confirmado/ }).isVisible(), "PIX: cliente vê pagamento confirmado (Purchase)");
 
+  // ── E-mails: confirmação enviada, lembrete de PIX cancelado, checkout ligado ao pedido ──
+  await page.waitForTimeout(1500);
+  const mailOrder = await prisma.order.findUnique({ where: { orderNumber: pixOrder }, include: { emailEvents: true, checkoutLead: true } });
+  const conf = mailOrder?.emailEvents.find((e) => e.type === "PURCHASE_CONFIRMATION");
+  const rec = mailOrder?.emailEvents.find((e) => e.type === "PIX_RECOVERY");
+  ok(conf?.status === "SENT", `e-mail: confirmação de compra enviada (${conf?.status ?? "nenhum"})`);
+  ok(rec?.status === "CANCELLED", `e-mail: lembrete de PIX agendado e cancelado ao pagar (${rec?.status ?? "nenhum"})`);
+  ok(Boolean(mailOrder?.checkoutLead), "checkout abandonado: contato capturado no checkout e ligado ao pedido");
+
   // ── Rastreio do pedido (linha do tempo automática + consulta pública) ──
   await page.goto(pixUrl);
   ok(await page.getByRole("heading", { name: "Acompanhe sua entrega" }).isVisible(), "pedido pago: linha do tempo de entrega na página do pedido");
@@ -224,7 +233,7 @@ async function run() {
   await admin.getByText(/Oferta salva/).first().waitFor({ timeout: 60000 });
 
   // Todas as páginas do admin
-  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/upsells", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=entrega", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
+  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/upsells", "/admin/checkouts", "/admin/configuracoes?aba=emails", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=entrega", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
     const res = await admin.goto(`${BASE}${path}`);
     const txt = await admin.locator("main").innerText().catch(() => "");
     ok(res?.status() === 200 && !/Application error|Unhandled Runtime Error/.test(txt), `admin ${path}`);

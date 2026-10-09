@@ -15,6 +15,7 @@ const GROUPS: { title: string; fields: Def[] }[] = [
     fields: [
       { key: "crediario_enabled", label: "Crediário ativo no checkout", type: "check" },
       { key: "crediario_method_label", label: "Nome do método", hint: "Ex.: Crediário, Pagamento por Protocolo" },
+      { key: "crediario_method_subtitle", label: "Texto abaixo do nome (opção de pagamento)", hint: "{parcelas} = máximo de parcelas. Ex.: Em até {parcelas}x · com o protocolo do seu crediário" },
       { key: "crediario_section_title", label: "Título da seção" },
       { key: "crediario_description", label: "Descrição", type: "textarea" },
     ],
@@ -127,7 +128,7 @@ export function CrediarioEditor({ initial, sampleTotalCents }: { initial: Record
               <span className="grid h-5 w-5 place-items-center rounded-full border-2 border-primary"><span className="h-2.5 w-2.5 rounded-full bg-primary" /></span>
               <span>
                 <span className="block font-bold text-navy">{cfg.methodLabel}</span>
-                <span className="block text-sm text-muted">{cfg.maxInstallments > 1 ? `Em até ${cfg.maxInstallments}x · ` : ""}com o protocolo do seu crediário</span>
+                <span className="block text-sm text-muted">{cfg.methodSubtitle}</span>
               </span>
             </div>
             <CrediarioFields cfg={cfg} totalCents={sampleTotalCents} value={preview} onChange={(v) => setPreview(v)} />

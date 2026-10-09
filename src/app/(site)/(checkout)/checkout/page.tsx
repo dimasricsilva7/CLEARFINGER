@@ -5,12 +5,13 @@ import { bravopayMode } from "@/lib/env";
 import { getActiveBumps, getMainProduct } from "@/server/catalog";
 import { getSettings, isOn, shippingCentsFrom } from "@/server/settings";
 import { CheckoutClient } from "./CheckoutClient";
+import { findLeadByToken } from "@/server/checkout-leads";
 
 export const metadata: Metadata = { title: "Finalizar pedido", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ oferta?: string }> }) {
-  const [{ oferta }, product, s, bumps] = await Promise.all([searchParams, getMainProduct(), getSettings(), getActiveBumps().catch(() => [])]);
+export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ oferta?: string; recuperar?: string }> }) {
+  const [{ oferta, recuperar }, product, s, bumps] = await Promise.all([searchParams, getMainProduct(), getSettings(), getActiveBumps().catch(() => [])]);
   if (!product?.offers.length) {
     return (
       <div className="container-page max-w-lg py-20 text-center">
@@ -19,7 +20,9 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       </div>
     );
   }
-  const initial = product.offers.find((o) => o.slug === oferta || o.id === oferta) ?? product.offers.find((o) => o.highlight) ?? product.offers[0];
+  // Link do e-mail de checkout abandonado: restaura kit, adicionais e contato
+  const lead = recuperar ? await findLeadByToken(recuperar).catch(() => null) : null;
+  const initial = (lead?.offerId ? product.offers.find((o) => o.id === lead.offerId) : undefined) ?? product.offers.find((o) => o.slug === oferta || o.id === oferta) ?? product.offers.find((o) => o.highlight) ?? product.offers[0];
   const cfg = crediarioConfig(s);
   return (
     <CheckoutClient
@@ -41,8 +44,9 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       consentLabel={s.marketing_consent_label}
       title={s.checkout_title || "Finalizar pedido"}
       securityText={s.checkout_security_text}
-      pix={{ enabled: isOn(s.pix_enabled) && bravopayMode() !== "disabled", label: s.pix_method_label || "PIX", description: s.pix_description, button: s.pix_button_label || "Gerar PIX" }}
+      pix={{ enabled: isOn(s.pix_enabled) && bravopayMode() !== "disabled", label: s.pix_method_label || "PIX", badge: s.pix_badge ?? "", description: s.pix_description, button: s.pix_button_label || "Gerar PIX" }}
       crediario={cfg}
+      recovered={lead && !lead.orderId ? { clientKey: lead.clientKey, name: lead.name, email: lead.email, phone: lead.phone, bumpIds: Array.isArray(lead.bumpIds) ? (lead.bumpIds as string[]) : [] } : null}
     />
   );
 }

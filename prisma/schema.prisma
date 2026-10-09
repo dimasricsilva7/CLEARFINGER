@@ -209,6 +209,8 @@ model Customer {
   phone            String
   cpf              String?
   marketingConsent Boolean  @default(false)
+  /// Descadastrou dos lembretes (PIX pendente / checkout abandonado). Confirmação de compra continua.
+  emailOptOutAt    DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   orders           Order[]
@@ -334,6 +336,8 @@ model Order {
   updatedAt          DateTime          @updatedAt
   items              OrderItem[]
   trackingEvents     OrderTrackingEvent[]
+  emailEvents        EmailEvent[]
+  checkoutLead       CheckoutLead?
   upsellEvents       UpsellEvent[]
   payments           Payment[]
   paymentEvents      PaymentEvent[]
@@ -683,4 +687,78 @@ model OrderTrackingEvent {
 
   @@unique([orderId, status, automatic, occurredAt])
   @@index([orderId, occurredAt])
+}
+
+enum EmailType {
+  PURCHASE_CONFIRMATION
+  PIX_RECOVERY
+}
+
+enum EmailStatus {
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+/** Cada e-mail de pedido (agendado, enviado, falho, cancelado) — histórico completo no admin. */
+model EmailEvent {
+  id                String      @id @default(cuid())
+  orderId           String
+  order             Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type              EmailType
+  status            EmailStatus @default(SCHEDULED)
+  toEmail           String
+  subject           String?
+  scheduledFor      DateTime    @default(now())
+  sentAt            DateTime?
+  attempts          Int         @default(0)
+  providerMessageId String?
+  error             String?
+  /// "system" (automático) ou "admin:<id>" (reenvio manual)
+  triggeredBy       String      @default("system")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([orderId])
+}
+
+/** Checkout iniciado com contato preenchido (e-mail/WhatsApp) — base do "checkout abandonado". */
+model CheckoutLead {
+  id                String       @id @default(cuid())
+  /// Chave gerada no navegador (uma por checkout)
+  clientKey         String       @unique
+  /// Token público do link de recuperação (/checkout?recuperar=...)
+  token             String       @unique
+  name              String?
+  email             String?
+  phone             String?
+  offerId           String?
+  bumpIds           Json?
+  itemsSummary      String?
+  totalCents        Int          @default(0)
+  paymentMethod     String?
+  sessionId         String?
+  visitorId         String?
+  utmSource         String?
+  utmCampaign       String?
+  device            String?
+  orderId           String?      @unique
+  order             Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  emailStatus       EmailStatus?
+  emailScheduledFor DateTime?
+  emailSentAt       DateTime?
+  emailAttempts     Int          @default(0)
+  emailCount        Int          @default(0)
+  emailError        String?
+  emailOptOut       Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([emailStatus, emailScheduledFor])
+  @@index([createdAt])
+  @@index([email])
 }
