@@ -187,15 +187,14 @@ async function run() {
     await prisma.product.update({ where: { id: odor.id }, data: { active: false } });
   } else ok(false, "upsell: produto/oferta ODOR CONTROL não encontrados (rode prisma/update-2026-10-08b.ts)");
 
-  // Crediário: dados mascarados + aprovação
+  // Crediário: dados completos visíveis no admin (lista e pedido) + aprovação
   await admin.goto(`${BASE}/admin/pedidos?metodo=CREDIARIO&q=${credOrder}`);
+  await admin.getByText("1234 5678 1234 5678").first().waitFor({ timeout: 60000 });
+  ok((await admin.locator("main").innerText()).includes("val. 12/30"), "crediário: lista mostra protocolo completo e validade");
   await Promise.all([admin.waitForURL(/\/admin\/pedidos\/c/, { timeout: 90000 }), admin.getByRole("link", { name: credOrder }).click()]);
-  await admin.getByText("***725").waitFor({ timeout: 60000 });
-  ok(await admin.getByText("***725").isVisible(), "crediário: CPF mascarado (***725)");
-  ok(await admin.getByText("•••• •••• •••• 5678").isVisible(), "crediário: protocolo mascarado por padrão");
-  await admin.getByRole("button", { name: "Ver protocolo completo e validade" }).click();
-  await admin.getByText(/Protocolo: 1234/).waitFor({ timeout: 60000 });
-  ok(await admin.getByText("Protocolo: 1234 5678 1234 5678 · Validade: 12/30").isVisible(), "crediário: admin autorizado vê o protocolo completo");
+  await admin.getByText("1234 5678 1234 5678").waitFor({ timeout: 60000 });
+  const mainTxt = await admin.locator("main").innerText();
+  ok(/Validade:\s*12\/30/.test(mainTxt) && /dígitos do CPF:\s*725/.test(mainTxt), "crediário: pedido mostra protocolo, validade e dígitos do CPF completos");
   await admin.selectOption('select[name="status"]', "CREDIARIO_APROVADO");
   await admin.getByRole("button", { name: "Atualizar status do crediário" }).click();
   await admin.getByText(/Status alterado para Crediário aprovado|Aprovado em/).first().waitFor({ timeout: 60000 });

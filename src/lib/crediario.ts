@@ -150,3 +150,6 @@ export function installmentOptions(totalCents: number, cfg: Pick<CrediarioConfig
 
 /** CPF mascarado para o admin: ***123 */
 export const maskCpfLast = (digits: string) => `***${digits}`;
+
+/** "1234567812345678" → "1234 5678 1234 5678" (exibição no admin). */
+export const formatProtocol = (p: string) => p.replace(/(\d{4})(?=\d)/g, "$1 ");

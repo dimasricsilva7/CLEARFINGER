@@ -128,15 +128,23 @@ export const TRACKED_EVENTS = [
 export type TrackedEvent = (typeof TRACKED_EVENTS)[number];
 
 /** Etapas do funil (cada etapa = sessões com pelo menos um dos eventos). */
-export const FUNNEL_STEPS: { key: string; label: string; events: TrackedEvent[] }[] = [
-  { key: "visitors", label: "Visitantes", events: ["page_view", "landing_view"] },
-  { key: "product", label: "Produto visto", events: ["product_view"] },
-  { key: "offer", label: "Oferta vista", events: ["offer_view", "offer_selected"] },
-  { key: "cta", label: "CTA clicado", events: ["cta_click", "offer_selected"] },
-  { key: "checkout", label: "Checkout", events: ["checkout_started"] },
-  { key: "method", label: "PIX / Crediário", events: ["payment_method_selected", "crediario_started", "pix_generated"] },
-  { key: "order", label: "Pedido criado", events: ["order_created"] },
-  { key: "approved", label: "Pagamento / aprovação", events: ["purchase"] },
+export type FunnelGroup = "common" | "PIX" | "CREDIARIO";
+/**
+ * Funil: etapas comuns até o checkout e, a partir daí, duas trilhas separadas (PIX e Crediário).
+ * `method` restringe eventos que carregam o método em props (payment_method_selected, purchase).
+ */
+export const FUNNEL_STEPS: { key: string; label: string; group: FunnelGroup; events: TrackedEvent[]; method?: "PIX" | "CREDIARIO" }[] = [
+  { key: "visitors", label: "Visitantes", group: "common", events: ["page_view", "landing_view"] },
+  { key: "product", label: "Produto visto", group: "common", events: ["product_view"] },
+  { key: "offer", label: "Oferta vista", group: "common", events: ["offer_view", "offer_selected"] },
+  { key: "cta", label: "CTA clicado", group: "common", events: ["cta_click", "offer_selected"] },
+  { key: "checkout", label: "Checkout", group: "common", events: ["checkout_started"] },
+  { key: "pix_method", label: "Escolheu PIX", group: "PIX", events: ["payment_method_selected", "pix_generated"], method: "PIX" },
+  { key: "pix_generated", label: "PIX gerado (pedido)", group: "PIX", events: ["pix_generated"] },
+  { key: "pix_paid", label: "PIX pago", group: "PIX", events: ["purchase"], method: "PIX" },
+  { key: "cred_method", label: "Escolheu crediário", group: "CREDIARIO", events: ["crediario_started"] },
+  { key: "cred_order", label: "Pedido no crediário", group: "CREDIARIO", events: ["crediario_order_created"] },
+  { key: "cred_approved", label: "Crediário aprovado", group: "CREDIARIO", events: ["crediario_approved"] },
 ];
 
 // ───────────── Landing page (CMS) ─────────────

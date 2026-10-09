@@ -68,7 +68,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
         <Card title="Pedidos por método"><DayBars data={d.daily.methods} series={["PIX", "Crediário"]} /></Card>
         <Card title="Conversão por dia"><DayBars data={d.daily.conversion} series={["Vendas ÷ visitantes"]} format="bps" /></Card>
         <Card title="Funil do período" actions={<Link href={`/admin/funil?${q}`} className="text-xs font-semibold text-slate-600 hover:underline">Detalhar →</Link>}>
-          <HBars rows={f.steps.map((s) => ({ label: s.label, value: s.value, sub: s.pctOfFirst ? pct(s.pctOfFirst) : undefined }))} />
+          <HBars rows={f.common.map((s) => ({ label: s.label, value: s.value, sub: s.pctOfFirst ? pct(s.pctOfFirst) : undefined }))} />
+          <div className="mt-5 grid gap-5 border-t border-slate-100 pt-4 sm:grid-cols-2">
+            {([["PIX", f.pix], ["Crediário", f.crediario]] as const).map(([label, b]) => (
+              <div key={label}>
+                <p className="mb-2 flex items-baseline justify-between text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <span>{label}</span>
+                  <span className="normal-case tracking-normal text-slate-600">conversão <b className="text-slate-900">{pct(b.conversion, 2)}</b></span>
+                </p>
+                <HBars rows={b.steps.map((s) => ({ label: s.label, value: s.value, sub: s.pctOfFirst ? pct(s.pctOfFirst) : undefined }))} />
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
 

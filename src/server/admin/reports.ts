@@ -188,7 +188,14 @@ function sessionFilter(f: FunnelFilters, p: Period) {
   return parts.length ? Prisma.sql`AND ${Prisma.join(parts, " AND ")}` : Prisma.empty;
 }
 
-const funnelCols = () => FUNNEL_STEPS.map((s, i) => Prisma.sql`COUNT(DISTINCT e."sessionId") FILTER (WHERE e.name IN (${Prisma.join(s.events)})) AS ${Prisma.raw(`s${i}`)}`);
+// Etapas com `method` exigem props.method certo — exceto pix_generated, que já é sempre PIX
+const stepCond = (s: (typeof FUNNEL_STEPS)[number]) => {
+  if (!s.method) return Prisma.sql`e.name IN (${Prisma.join(s.events)})`;
+  const withProp = s.events.filter((ev) => ev !== "pix_generated");
+  const pixGen = s.method === "PIX" && s.events.includes("pix_generated") ? Prisma.sql` OR e.name = 'pix_generated'` : Prisma.empty;
+  return Prisma.sql`(e.name IN (${Prisma.join(withProp)}) AND e.props->>'method' = ${s.method})${pixGen}`;
+};
+const funnelCols = () => FUNNEL_STEPS.map((s, i) => Prisma.sql`COUNT(DISTINCT e."sessionId") FILTER (WHERE ${stepCond(s)}) AS ${Prisma.raw(`s${i}`)}`);
 
 /**
  * Funil por sessão. Eventos de servidor (pedido, compra) são ligados à sessão do navegador
@@ -197,16 +204,28 @@ const funnelCols = () => FUNNEL_STEPS.map((s, i) => Prisma.sql`COUNT(DISTINCT e.
 export async function funnel(p: Period, f: FunnelFilters = {}) {
   const rows = await db.$queryRaw<Record<string, bigint>[]>`
     SELECT ${Prisma.join(funnelCols())},
-           COALESCE(SUM(e."valueCents") FILTER (WHERE e.name = 'purchase'), 0) AS revenue
+           COALESCE(SUM(e."valueCents") FILTER (WHERE e.name = 'purchase' AND e.props->>'method' = 'PIX'), 0) AS revenue_pix,
+           COALESCE(SUM(e."valueCents") FILTER (WHERE e.name = 'purchase' AND e.props->>'method' = 'CREDIARIO'), 0) AS revenue_cred
     FROM "TrackingEvent" e JOIN "VisitorSession" s ON s.id = e."sessionId"
     WHERE e."createdAt" >= ${p.from} AND e."createdAt" < ${p.to} ${sessionFilter(f, p)}`;
   const r = rows[0] ?? {};
-  const steps = FUNNEL_STEPS.map((s, i) => ({ key: s.key, label: s.label, value: n(r[`s${i}`]) }));
-  const first = steps[0]?.value ?? 0;
+  const raw = FUNNEL_STEPS.map((s, i) => ({ key: s.key, label: s.label, group: s.group, value: n(r[`s${i}`]) }));
+  const first = raw[0]?.value ?? 0;
+  const checkout = raw.find((s) => s.key === "checkout")?.value ?? 0;
+  // "etapa anterior" é da mesma trilha; a 1ª etapa de cada trilha compara com o checkout
+  const steps = raw.map((s, i) => {
+    const prev = i === 0 ? null : raw[i - 1].group === s.group || s.group === "common" ? raw[i - 1].value : checkout;
+    return { ...s, pctOfFirst: ratio(s.value, first), fromPrev: prev == null ? 1 : ratio(s.value, prev) };
+  });
+  const pixPaid = raw.find((s) => s.key === "pix_paid")?.value ?? 0;
+  const credApproved = raw.find((s) => s.key === "cred_approved")?.value ?? 0;
   return {
-    steps: steps.map((s, i) => ({ ...s, pctOfFirst: ratio(s.value, first), fromPrev: i ? ratio(s.value, steps[i - 1].value) : 1 })),
-    revenue: n(r.revenue),
-    conversion: ratio(steps.at(-1)?.value ?? 0, first),
+    steps,
+    common: steps.filter((s) => s.group === "common"),
+    pix: { steps: steps.filter((s) => s.group === "PIX"), sales: pixPaid, revenue: n(r.revenue_pix), conversion: ratio(pixPaid, first), fromCheckout: ratio(pixPaid, checkout) },
+    crediario: { steps: steps.filter((s) => s.group === "CREDIARIO"), sales: credApproved, revenue: n(r.revenue_cred), conversion: ratio(credApproved, first), fromCheckout: ratio(credApproved, checkout) },
+    revenue: n(r.revenue_pix) + n(r.revenue_cred),
+    conversion: ratio(pixPaid + credApproved, first),
   };
 }
 
@@ -223,7 +242,15 @@ export async function funnelByDay(p: Period, f: FunnelFilters = {}) {
     .map((day) => {
       const r = byDay.get(day) ?? {};
       const values = FUNNEL_STEPS.map((_, i) => n(r[`s${i}`] as bigint | undefined));
-      return { day, values, revenue: n(r.revenue as bigint | undefined), conversion: ratio(values.at(-1) ?? 0, values[0] ?? 0) };
+      const at = (key: string) => values[FUNNEL_STEPS.findIndex((s) => s.key === key)] ?? 0;
+      return {
+        day,
+        values,
+        revenue: n(r.revenue as bigint | undefined),
+        conversionPix: ratio(at("pix_paid"), values[0] ?? 0),
+        conversionCred: ratio(at("cred_approved"), values[0] ?? 0),
+        conversion: ratio(at("pix_paid") + at("cred_approved"), values[0] ?? 0),
+      };
     });
 }
 

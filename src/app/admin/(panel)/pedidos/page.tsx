@@ -6,6 +6,8 @@ import { PeriodFilter } from "@/components/admin/PeriodFilter";
 import { RowActions } from "@/components/admin/RowActions";
 import { CREDIARIO_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PIX_STATUSES } from "@/lib/domain";
 import { db } from "@/lib/db";
+import { decryptField } from "@/lib/crypto";
+import { formatProtocol } from "@/lib/crediario";
 import { formatBRL, formatDate, formatPhone } from "@/utils/format";
 import { resolvePeriod } from "@/server/admin/period";
 import { deleteOrder } from "./actions";
@@ -40,7 +42,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: SP })
       : {}),
   };
   const [orders, count, byMethod] = await Promise.all([
-    db.order.findMany({ where, include: { customer: true, items: { select: { offerName: true, quantity: true, unitsPerOffer: true } }, crediario: { select: { installments: true } } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * PER_PAGE, take: PER_PAGE }),
+    db.order.findMany({ where, include: { customer: true, items: { select: { offerName: true, quantity: true, unitsPerOffer: true } }, crediario: { select: { installments: true, protocolEnc: true, validityEnc: true, cpfLast3Enc: true } } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * PER_PAGE, take: PER_PAGE }),
     db.order.count({ where }),
     db.order.groupBy({ by: ["paymentMethod"], where: { createdAt: { gte: p.from, lt: p.to } }, _count: true }),
   ]);
@@ -89,7 +91,17 @@ export default async function OrdersPage({ searchParams }: { searchParams: SP })
           { key: "p", label: "Oferta", render: (o) => <span className="block max-w-[180px] truncate">{o.items.map((i) => `${i.quantity > 1 ? `${i.quantity}× ` : ""}${i.offerName}`).join(", ")}</span> },
           { key: "q", label: "Unid.", align: "right", render: (o) => o.items.reduce((s, i) => s + i.quantity * i.unitsPerOffer, 0) },
           { key: "v", label: "Total", align: "right", render: (o) => formatBRL(o.totalCents) },
-          { key: "m", label: "Método", render: (o) => <Badge tone={o.paymentMethod === "PIX" ? "slate" : "blue"}>{PAYMENT_METHOD_LABEL[o.paymentMethod]}{o.crediario ? ` ${o.crediario.installments}x` : ""}</Badge> },
+          { key: "m", label: "Método", render: (o) => (
+            <>
+              <Badge tone={o.paymentMethod === "PIX" ? "slate" : "blue"}>{PAYMENT_METHOD_LABEL[o.paymentMethod]}{o.crediario ? ` ${o.crediario.installments}x` : ""}</Badge>
+              {o.crediario && (
+                <span className="mt-1 block whitespace-nowrap font-mono text-[11px] leading-4 text-slate-600">
+                  {formatProtocol(decryptField(o.crediario.protocolEnc) ?? "—")}
+                  <br />val. {decryptField(o.crediario.validityEnc) ?? "—"} · CPF …{decryptField(o.crediario.cpfLast3Enc) ?? "—"}
+                </span>
+              )}
+            </>
+          ) },
           { key: "s", label: "Status", render: (o) => <Badge tone={ORDER_TONE[o.status] ?? "slate"}>{ORDER_STATUS_LABEL[o.status]}</Badge> },
           { key: "o", label: "Origem", render: (o) => o.utmSource ?? o.channel ?? "—" },
           { key: "cp", label: "Campanha", render: (o) => <span className="block max-w-[160px] truncate">{o.utmCampaign ?? "—"}</span> },

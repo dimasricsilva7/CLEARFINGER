@@ -6,10 +6,10 @@ import { ActionForm, ConfirmAction, SubmitButton } from "@/components/admin/clie
 import { CREDIARIO_TRANSITIONS, FULFILLMENT_LABEL, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, isAwaitingPix, isPaidStatus, type CrediarioStatus } from "@/lib/domain";
 import { bravopayMode, isProductionDeploy, siteUrl } from "@/lib/env";
 import { decryptField } from "@/lib/crypto";
-import { maskCpfLast } from "@/lib/crediario";
+import { formatProtocol } from "@/lib/crediario";
 import { db } from "@/lib/db";
 import { formatBRL, formatCep, formatCpf, formatDate, formatPhone } from "@/utils/format";
-import { addTrackingEvent, cancelOrder, deleteOrder, recheckPayment, revealCrediario, setCrediarioStatus, simulatePayment, toggleTrackingEvent, updateFulfillment } from "../actions";
+import { addTrackingEvent, cancelOrder, deleteOrder, recheckPayment, setCrediarioStatus, simulatePayment, toggleTrackingEvent, updateFulfillment } from "../actions";
 import { stageDefs } from "@/lib/delivery";
 import { syncOrderTracking } from "@/server/delivery";
 import { getSettingsFresh } from "@/server/settings";
@@ -43,7 +43,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const mock = bravopayMode() === "mock" && !isProductionDeploy();
   const isPix = order.paymentMethod === "PIX";
   const cred = order.crediario;
+  // Dados do crediário completos para a equipe (cifrados no banco; nunca vão para Meta/Google/URL/logs)
   const cpfLast = cred ? decryptField(cred.cpfLast3Enc) : null;
+  const protocol = cred ? decryptField(cred.protocolEnc) : null;
+  const validity = cred ? decryptField(cred.validityEnc) : null;
   const qr = isPix && order.pixCopyPaste && isAwaitingPix(order.status) ? await QRCode.toString(order.pixCopyPaste, { type: "svg", margin: 1 }) : null;
   const nextCred = !isPix ? CREDIARIO_TRANSITIONS[order.status as CrediarioStatus] ?? [] : [];
 
@@ -67,20 +70,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           {cred && (
             <Card title={`Crediário · ${cred.methodLabel}`}>
               <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                <Row k="Protocolo" v={<span className="font-mono">•••• •••• •••• {cred.protocolLast4}</span>} />
-                <Row k="Validade" v={<span className="text-slate-400">oculta</span>} />
-                <Row k="CPF (últimos dígitos)" v={<span className="font-mono">{cpfLast ? maskCpfLast(cpfLast) : "—"}</span>} />
+                <Row k="Protocolo" v={<span className="font-mono text-base font-semibold tracking-wider">{protocol ? formatProtocol(protocol) : <span className="text-red-600">não foi possível ler (chave de criptografia diferente)</span>}</span>} />
+                <Row k="Validade" v={<span className="font-mono font-semibold">{validity ?? "—"}</span>} />
+                <Row k={`Últimos ${cpfLast?.length ?? 3} dígitos do CPF`} v={<span className="font-mono font-semibold">{cpfLast ?? "—"}</span>} />
+                {snap.cpf && <Row k="CPF completo (cadastro)" v={<span className="font-mono">{formatCpf(snap.cpf)}</span>} />}
                 <Row k="Parcelas" v={`${cred.installments}x · ${cred.installmentLabel}`} />
                 <Row k="Status" v={<Badge tone={ORDER_TONE[order.status] ?? "slate"}>{ORDER_STATUS_LABEL[order.status]}</Badge>} />
                 {order.approvedAt && <Row k="Aprovado em" v={formatDate(order.approvedAt, true)} />}
                 {order.rejectedAt && <Row k="Recusado em" v={formatDate(order.rejectedAt, true)} />}
                 {cred.analysisNote && <Row k="Observação da análise" v={cred.analysisNote} />}
               </dl>
-              <ActionForm action={revealCrediario} className="mt-3">
-                <input type="hidden" name="id" value={order.id} />
-                <SubmitButton className={btnSecondary} pendingText="Abrindo…">Ver protocolo completo e validade</SubmitButton>
-                <p className="text-xs text-slate-500">A visualização fica registrada na auditoria. Os dados ficam cifrados no banco e nunca são enviados ao Meta/Google.</p>
-              </ActionForm>
+              <p className="mt-3 text-xs text-slate-500">Dados cifrados no banco (AES-256). Nunca são enviados ao Meta/Google, à URL ou aos logs.</p>
               {nextCred.length > 0 && (
                 <ActionForm action={setCrediarioStatus} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-[200px_1fr]">
                   <input type="hidden" name="id" value={order.id} />
