@@ -93,6 +93,25 @@ Cadastre no painel BravoPay: `https://SEU-DOMINIO/api/webhooks/bravopay` e copie
 - **Admin → Ofertas → Upsell**: oferta na página do pedido depois da compra (PIX pago e/ou pedido no crediário), com produto, título, descrição, preço, imagem, textos dos botões, posição e ordem. **Aceitar** cria um novo pedido PIX vinculado (`Order.parentOrderId`, `source = UPSELL`); **recusar** só esconde. O pedido original nunca é alterado. Métricas de exibição/aceite/recusa na própria página.
 - Produtos complementares (`prisma/update-2026-10-08b.ts`): **CLEARFINGER HAND CARE** e **CLEARFINGER ODOR CONTROL** foram criados **inativos, sem imagem e com preço provisório** — assim como os bumps/upsell deles. Cadastre a foto real e o preço em Produtos e ative.
 
+## E-mails
+
+Resend (API REST) — `RESEND_API_KEY` + `EMAIL_FROM` (domínio verificado). Templates no visual da marca em `src/emails/templates.ts` (tabelas + estilos inline; logo e foto em PNG/JPG em `public/email/`, gerados por `scripts/email-assets.ts`).
+
+| E-mail | Quando | Cancelado se |
+|---|---|---|
+| Confirmação de compra | PIX pago ou crediário aprovado (na hora) | — |
+| PIX pendente | 10 min após gerar o PIX (configurável) | o pedido for pago |
+| Checkout abandonado | 30 min após a última digitação no checkout (configurável) | virar pedido / descadastro / 72 h |
+
+- Cada envio fica em `EmailEvent` (agendado, enviado, falhou, cancelado) e aparece no pedido; reenvio manual na lista e na página do pedido (anti-spam de 2 min).
+- Checkout abandonado: `CheckoutLead` guarda nome, e-mail, WhatsApp e o kit (nunca CPF, endereço ou crediário). O link `/checkout?recuperar=…` restaura tudo. Admin → Checkouts abandonados (reenviar e-mail, WhatsApp).
+- Lembretes têm descadastro one-click (`List-Unsubscribe`). Textos, tempos, prévia e e-mail de teste em Configurações → E-mails.
+- Os agendados saem pelo `/api/tick` (agendador externo a cada 1 min) e pelo `/api/cron/all`.
+
+## Anúncios e ROAS
+
+Admin → Anúncios e ROAS. `META_ADS_ACCESS_TOKEN` (ads_read) + IDs das contas. Importa gasto diário por campanha (Marketing API, a cada 30 min, últimos 3 dias; botão para 30 dias), converte USD → BRL pela PTAX de venda do Banco Central do dia (ou cotação manual) + IOF configurável, e compara com as vendas confirmadas (PIX pago, crediário aprovado): ROAS da Meta (vendas com origem facebook/instagram), ROAS geral, CPA, por campanha (casada por `utm_id` ou nome) e por dia.
+
 ## Tracking
 
 - **Próprio** (`VisitorSession` + `TrackingEvent`): visitor_id (cookie `cf_vid`, 1 ano), sessão de 30 min, UTMs first/last touch, `fbclid`/`gclid`/`ttclid`, `adset`/`ad`, dispositivo. Eventos do navegador vão em lote para `/api/track`; eventos críticos (pedido, PIX, compra, crediário) são gravados no servidor e ligados à mesma sessão.
@@ -100,7 +119,7 @@ Cadastre no painel BravoPay: `https://SEU-DOMINIO/api/webhooks/bravopay` e copie
 - **Online agora**: batimento a cada 30 s (`/api/ping`) — admin mostra página atual, dispositivo, origem, campanha e tempo de sessão.
 - **Meta Pixel + CAPI**: PageView, ViewContent, InitiateCheckout, AddPaymentInfo, Purchase. Purchase só após confirmação (PIX pago / crediário aprovado), com o mesmo `event_id` no navegador e no servidor (deduplicação). Tokens CAPI só no servidor.
 - **Google**: GA4, Google Ads e GTM — uma implementação de cada tag, IDs validados (sem scripts arbitrários).
-- **UTMs** acompanham sessão, pedido (`Order` + `UtmData`), cobrança PIX (enviadas à BravoPay) e compra.
+- **UTMs** (source, medium, campaign, content, term, `utm_id`/`campaign_id`, conjunto e anúncio, fbclid/gclid/ttclid) acompanham sessão, pedido (`Order` + `UtmData`), cobrança PIX (enviadas à BravoPay) e compra — verificados no E2E.
 - Aviso de cookies com aceitar / recusar / configurar (modelo de recusa, como no HAMA); não aparece no checkout.
 
 ## Admin
