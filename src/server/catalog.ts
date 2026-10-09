@@ -96,6 +96,7 @@ export async function getActiveBumps(): Promise<PublicBump[]> {
       priceCents: b.priceCents,
       compareAtPriceCents: b.compareAtPriceCents && b.compareAtPriceCents > b.priceCents ? b.compareAtPriceCents : null,
       imageUrl: b.imageUrl || b.product.images[0]?.url || null,
+      imageCount: b.imageUrl ? 1 : b.quantity,
       badge: b.badge,
       productName: b.product.name,
     }));

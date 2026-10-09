@@ -32,3 +32,12 @@ export function ProductStack({ src, alt, count = 1, className = "", priority = f
 export function Stage({ children, className = "", tone = "light" }: { children: React.ReactNode; className?: string; tone?: "light" | "onDark" }) {
   return <div className={`relative overflow-hidden rounded-[1.75rem] bg-white ${tone === "onDark" ? "shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]" : "shadow-soft ring-1 ring-line/70"} ${className}`}>{children}</div>;
 }
+
+/**
+ * Imagem de um kit: se o kit tem imagem própria (enviada no admin), ela já mostra todas as unidades
+ * e aparece UMA vez; sem imagem própria, a foto do produto é repetida pela quantidade.
+ */
+export function kitVisual(kitImage: string | null | undefined, productImage: string | null | undefined, quantity: number) {
+  if (kitImage) return { src: kitImage, count: 1 };
+  return { src: productImage ?? null, count: quantity };
+}

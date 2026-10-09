@@ -45,6 +45,8 @@ export type PublicBump = {
   priceCents: number;
   compareAtPriceCents: number | null;
   imageUrl: string | null;
+  /** 1 quando o bump tem imagem própria (já mostra as unidades); senão, a quantidade */
+  imageCount: number;
   badge: string | null;
   productName: string;
 };

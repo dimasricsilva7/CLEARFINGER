@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CrediarioFields, EMPTY_CREDIARIO, type CrediarioValue } from "@/components/checkout/CrediarioFields";
 import { Icon } from "@/components/ui/Icon";
-import { ProductStack, Stage } from "@/components/ui/ProductStage";
+import { kitVisual, ProductStack, Stage } from "@/components/ui/ProductStage";
 import { gaEvent, getClientContext, metaEvent, newEventId, randomId, track, trackOnce } from "@/lib/client/tracking";
 import { parseValidity, validateCrediario, type CrediarioConfig } from "@/lib/crediario";
 import { offerDiscountLabel } from "@/lib/pricing";
@@ -68,6 +68,7 @@ export function CheckoutClient(p: CheckoutProps) {
   const offer = p.offers.find((o) => o.id === offerId) ?? p.offers[0];
   const [bumpIds, setBumpIds] = useState<string[]>([]);
   const chosenBumps = p.bumps.filter((b) => bumpIds.includes(b.id));
+  const kitImg = kitVisual(offer.imageUrl, p.imageUrl, offer.quantity);
   const totalCents = offer.priceCents + chosenBumps.reduce((s, b) => s + b.priceCents, 0) + p.shippingCents;
   const savings = (offer.compareAtPriceCents ? offer.compareAtPriceCents - offer.priceCents : 0) + chosenBumps.reduce((s, b) => s + (b.compareAtPriceCents ? b.compareAtPriceCents - b.priceCents : 0), 0);
   const methods = [p.pix.enabled && "PIX", p.crediario.enabled && "CREDIARIO"].filter(Boolean) as ("PIX" | "CREDIARIO")[];
@@ -328,9 +329,9 @@ export function CheckoutClient(p: CheckoutProps) {
         {/* Produto e kit */}
         <section className="card overflow-hidden" aria-labelledby="h-pedido">
           <div className="grid items-center gap-2 bg-white px-4 pt-4 sm:grid-cols-[200px_1fr] sm:gap-5 sm:p-5">
-            {p.imageUrl && (
+            {kitImg.src && (
               <Stage className="mx-auto aspect-[1/0.85] w-full max-w-[15rem] sm:max-w-none">
-                <ProductStack src={p.imageUrl} alt={p.productName} count={offer.quantity} className="absolute inset-x-0 bottom-[6%] top-[4%]" priority />
+                <ProductStack src={kitImg.src} alt={p.productName} count={kitImg.count} className="absolute inset-x-0 bottom-[6%] top-[4%]" priority />
               </Stage>
             )}
             <div className="pb-4 sm:pb-0">
@@ -364,7 +365,7 @@ export function CheckoutClient(p: CheckoutProps) {
                         }}
                       />
                       {o.badge && <span className={`absolute -top-2.5 whitespace-nowrap rounded-full px-2 text-[10px] font-bold leading-5 text-white ${o.highlight ? "bg-primary" : "bg-navy"}`}>{o.badge.length > 14 ? (o.highlight ? "Destaque" : "Mais econômico") : o.badge}</span>}
-                      {p.imageUrl && <ProductStack src={p.imageUrl} alt="" count={o.quantity} className="h-16 w-full" />}
+                      {(() => { const k = kitVisual(o.imageUrl, p.imageUrl, o.quantity); return k.src && <ProductStack src={k.src} alt="" count={k.count} className="h-16 w-full" />; })()}
                       <span className="mt-1.5 text-sm font-bold text-navy">{o.quantity} {o.quantity === 1 ? "unidade" : "unidades"}</span>
                       <span className="text-[13px] font-semibold tabular-nums text-ink">{formatBRL(o.priceCents)}</span>
                       {o.quantity > 1 && <span className="text-[11px] text-muted">{formatBRL(o.unitPriceCents)}/un.</span>}
@@ -456,7 +457,7 @@ export function CheckoutClient(p: CheckoutProps) {
                   </span>
                   {b.imageUrl && (
                     <span className="relative h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-white sm:h-20 sm:w-20">
-                      <ProductStack src={b.imageUrl} alt="" count={b.quantity} className="absolute inset-1" />
+                      <ProductStack src={b.imageUrl} alt="" count={b.imageCount} className="absolute inset-1" />
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
@@ -546,10 +547,10 @@ export function CheckoutClient(p: CheckoutProps) {
 
       <aside className="hidden lg:sticky lg:top-24 lg:block">
         <div className="card overflow-hidden">
-          {p.imageUrl && (
+          {kitImg.src && (
             <div className="bg-white px-6 pt-6">
               <Stage className="mx-auto aspect-[1/0.8] w-full max-w-[16rem]">
-                <ProductStack src={p.imageUrl} alt="" count={offer.quantity} className="absolute inset-x-0 bottom-[6%] top-[4%]" />
+                <ProductStack src={kitImg.src} alt="" count={kitImg.count} className="absolute inset-x-0 bottom-[6%] top-[4%]" />
               </Stage>
             </div>
           )}

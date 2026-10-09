@@ -25,12 +25,12 @@ function useCountdown(iso: string | null) {
   return left;
 }
 
-function Summary({ order, imageUrl }: { order: PublicOrder; imageUrl: string | null }) {
+function Summary({ order, imageUrl, imageIsKit }: { order: PublicOrder; imageUrl: string | null; imageIsKit: boolean }) {
   const main = order.items.find((i) => i.kind === "OFFER") ?? order.items[0];
   return (
     <section className="card overflow-hidden">
       <div className="flex items-center gap-4 border-b border-line bg-white p-4">
-        {imageUrl && main && <ProductStack src={imageUrl} alt="" count={main.units * main.quantity} className="h-20 w-24 shrink-0" />}
+        {imageUrl && main && <ProductStack src={imageUrl} alt="" count={imageIsKit ? main.quantity : main.units * main.quantity} className="h-20 w-24 shrink-0" />}
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">Resumo do pedido</p>
           <p className="font-semibold text-navy">{main?.name}</p>
@@ -87,7 +87,7 @@ function NextSteps({ paid }: { paid: boolean }) {
 
 export type CrediarioTexts = { successTitle: string; successMessage: string; infoMessage: string };
 
-export function OrderClient({ initial, token, qrSvg, whatsappUrl, storeName, crediarioTexts, imageUrl }: { initial: PublicOrder; token: string; qrSvg: string | null; whatsappUrl: string | null; storeName: string; crediarioTexts: CrediarioTexts; imageUrl: string | null }) {
+export function OrderClient({ initial, token, qrSvg, whatsappUrl, storeName, crediarioTexts, imageUrl, imageIsKit = false }: { initial: PublicOrder; token: string; qrSvg: string | null; whatsappUrl: string | null; storeName: string; crediarioTexts: CrediarioTexts; imageUrl: string | null; imageIsKit?: boolean }) {
   const router = useRouter();
   const [order, setOrder] = useState(initial);
   const [copied, setCopied] = useState(false);
@@ -353,7 +353,7 @@ export function OrderClient({ initial, token, qrSvg, whatsappUrl, storeName, cre
         </section>
       )}
 
-      <Summary order={order} imageUrl={imageUrl} />
+      <Summary order={order} imageUrl={imageUrl} imageIsKit={imageIsKit} />
       {order.upsell && order.upsell.position === "BOTTOM" && <UpsellCard upsell={order.upsell} orderNumber={order.orderNumber} token={token} />}
       {(awaiting || (paid && !order.timeline?.length)) && <NextSteps paid={paid} />}
 

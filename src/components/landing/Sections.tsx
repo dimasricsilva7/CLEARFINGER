@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Faq, Testimonial } from "@prisma/client";
 import { Icon } from "@/components/ui/Icon";
-import { ProductStack, Stage } from "@/components/ui/ProductStage";
+import { kitVisual, ProductStack, Stage } from "@/components/ui/ProductStage";
 import { cfgArr, cfgStr, type SectionData } from "@/server/landing";
 import { offerDiscountLabel } from "@/lib/pricing";
 import { formatBRL } from "@/utils/format";
@@ -375,13 +375,14 @@ function Offers({ s, ctx, tone }: P) {
             const disc = offerDiscountLabel(o);
             const hint = ctx.crediarioHint(o.priceCents);
             const save = o.compareAtPriceCents ? o.compareAtPriceCents - o.priceCents : null;
-            const img = o.imageUrl || productImg(ctx);
+            const kit = kitVisual(o.imageUrl, productImg(ctx), o.quantity);
+            const img = kit.src;
             return (
               <li key={o.id} className={`relative flex flex-col overflow-hidden rounded-[1.5rem] bg-surface text-ink ${o.highlight ? "order-first shadow-[0_30px_60px_-25px_rgba(0,0,0,0.55)] ring-2 ring-primary md:order-none md:scale-[1.04]" : "shadow-lift ring-1 ring-line"}`}>
                 <ViewTracker id={`offer-${o.id}`} event="offer_view" productId={p.id} offerId={o.id} valueCents={o.priceCents} />
                 {o.badge && <span className={`absolute inset-x-0 top-0 z-10 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white ${o.highlight ? "bg-primary" : "bg-navy"}`}>{o.badge}</span>}
                 <div className={`relative bg-white px-6 ${o.badge ? "pt-10" : "pt-6"}`}>
-                  {img && <ProductStack src={img} alt={`${p.name} — ${o.name}`} count={o.quantity} className="mx-auto aspect-[1/0.82] w-full max-w-[17rem]" />}
+                  {img && <ProductStack src={img} alt={`${p.name} — ${o.name}`} count={kit.count} className="mx-auto aspect-[1/0.82] w-full max-w-[17rem]" />}
                   {o.quantity > 1 && <span className="absolute bottom-1 left-5 z-10 grid h-11 w-11 place-items-center rounded-full bg-navy font-display text-base font-semibold text-white shadow-lift ring-4 ring-surface">×{o.quantity}</span>}
                 </div>
                 <div className="flex flex-1 flex-col p-6 pt-4">
