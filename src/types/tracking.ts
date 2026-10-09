@@ -4,6 +4,8 @@ export type Touch = {
   campaign?: string | null;
   content?: string | null;
   term?: string | null;
+  /** utm_id / campaign_id — ID da campanha no gerenciador de anúncios */
+  id?: string | null;
   at?: number;
 };
 

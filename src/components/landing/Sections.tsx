@@ -449,14 +449,17 @@ function Trust({ s, tone }: P) {
     <section className={`section ${BG[tone]}`}>
       <div className="container-page">
         <Heading s={s} tone={tone} center />
-        <ul className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
+        {/* celular: 1 coluna (ícone à esquerda) — cards com a mesma largura e sem espaço vazio; tablet 2 e desktop 4 colunas */}
+        <ul className="mx-auto mt-8 grid max-w-md grid-cols-1 gap-3 sm:mt-10 sm:max-w-none sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
           {items.map((it, i) => (
-            <li key={i} className={`flex flex-col rounded-card p-4 sm:p-6 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : tone === "mist" ? "bg-surface shadow-soft ring-1 ring-line" : "bg-mist/60"}`}>
-              <span className={`grid h-11 w-11 place-items-center rounded-full ${d ? "bg-white/10 text-sky-300" : "bg-primary/10 text-primary"}`}>
+            <li key={i} className={`flex items-center gap-4 rounded-card p-4 sm:flex-col sm:items-start sm:gap-0 sm:p-6 ${d ? "bg-white/[0.06] ring-1 ring-white/10" : tone === "mist" ? "bg-surface shadow-soft ring-1 ring-line" : "bg-mist/60"}`}>
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${d ? "bg-white/10 text-sky-300" : "bg-primary/10 text-primary"}`}>
                 <Icon name={it.icon ?? "shield"} className="h-6 w-6" />
               </span>
-              <p className={`mt-4 text-[15px] font-semibold leading-snug ${d ? "text-white" : "text-navy"}`}>{it.title}</p>
-              {it.text && <p className={`mt-1.5 text-[13px] leading-relaxed ${d ? "text-white/65" : "text-muted"}`}>{it.text}</p>}
+              <div className="min-w-0">
+                <p className={`text-[15px] font-semibold leading-snug sm:mt-4 ${d ? "text-white" : "text-navy"}`}>{it.title}</p>
+                {it.text && <p className={`mt-1 text-[13px] leading-relaxed sm:mt-1.5 ${d ? "text-white/65" : "text-muted"}`}>{it.text}</p>}
+              </div>
             </li>
           ))}
         </ul>

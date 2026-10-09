@@ -33,6 +33,11 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   sticky_cta_label: "QUERO O MEU CLEARFINGER",
   footer_text: "",
   // Envio
+  // Anúncios (Admin → Anúncios e ROAS)
+  ads_account_ids: "",
+  ads_fx_mode: "ptax",
+  ads_fx_manual_rate: "",
+  ads_fx_fee_pct: "3.5",
   // E-mails automáticos (Admin → Configurações → E-mails). {nome} e {pedido} são substituídos.
   email_confirmation_enabled: "true",
   email_confirmation_subject: "Pedido {pedido} confirmado ✓",

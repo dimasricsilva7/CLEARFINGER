@@ -59,7 +59,7 @@ async function run() {
   page.on("pageerror", (e) => errors.push(e.message));
 
   // ── 1. Landing com UTMs ──
-  await page.goto(`${BASE}/?utm_source=facebook&utm_medium=cpc&utm_campaign=e2e_campanha&utm_content=anuncio1&utm_term=conjunto1&fbclid=e2efbclid`);
+  await page.goto(`${BASE}/?utm_source=facebook&utm_medium=cpc&utm_campaign=e2e_campanha&utm_content=anuncio1&utm_term=conjunto1&utm_id=120200000000001&fbclid=e2efbclid`);
   ok(await page.locator("h1").isVisible(), "landing: headline visível");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(overflow <= 0, `landing: sem scroll horizontal em 390px (${overflow})`);
@@ -133,6 +133,11 @@ async function run() {
   // Página do cliente mostra confirmação
   await page.goto(pixUrl);
   ok(await page.getByRole("heading", { name: /Pagamento confirmado/ }).isVisible(), "PIX: cliente vê pagamento confirmado (Purchase)");
+
+  const utmOrder = await prisma.order.findUnique({ where: { orderNumber: pixOrder }, include: { utm: true } });
+  ok(utmOrder?.utmSource === "facebook" && utmOrder.utmMedium === "cpc" && utmOrder.utmCampaign === "e2e_campanha" && utmOrder.utmContent === "anuncio1" && utmOrder.utmTerm === "conjunto1" && utmOrder.utmId === "120200000000001", "UTMs: source, medium, campaign, content, term e utm_id gravados no pedido");
+  ok(utmOrder?.fbclid === "e2efbclid" && Boolean(utmOrder.fbc) && utmOrder.channel === "facebook", "UTMs: fbclid, cookie _fbc e canal (facebook) gravados");
+  ok(utmOrder?.utm?.adset === "conjunto1" && utmOrder.utm.ad === "anuncio1", "UTMs: conjunto e anúncio gravados (UtmData)");
 
   // ── E-mails: confirmação enviada, lembrete de PIX cancelado, checkout ligado ao pedido ──
   await page.waitForTimeout(1500);
@@ -233,7 +238,7 @@ async function run() {
   await admin.getByText(/Oferta salva/).first().waitFor({ timeout: 60000 });
 
   // Todas as páginas do admin
-  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/upsells", "/admin/checkouts", "/admin/configuracoes?aba=emails", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=entrega", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
+  for (const path of ["/admin", "/admin/funil", "/admin/metricas", "/admin/tracking", "/admin/pedidos", "/admin/clientes", "/admin/produtos", "/admin/ofertas", "/admin/order-bumps", "/admin/upsells", "/admin/checkouts", "/admin/configuracoes?aba=emails", "/admin/anuncios", "/admin/imagens", "/admin/landing", "/admin/landing/hero", "/admin/landing/demonstracao", "/admin/depoimentos", "/admin/faq", "/admin/pagamentos", "/admin/pagamentos/crediario", "/admin/webhooks", "/admin/configuracoes", "/admin/configuracoes?aba=entrega", "/admin/configuracoes?aba=rastreamento", "/admin/configuracoes?aba=sistema", "/admin/auditoria", "/admin/usuarios"]) {
     const res = await admin.goto(`${BASE}${path}`);
     const txt = await admin.locator("main").innerText().catch(() => "");
     ok(res?.status() === 200 && !/Application error|Unhandled Runtime Error/.test(txt), `admin ${path}`);

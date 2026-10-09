@@ -295,6 +295,8 @@ model Order {
   utmCampaign        String?
   utmContent         String?
   utmTerm            String?
+  /// ID da campanha (utm_id) — casa vendas com o gasto no gerenciador de anúncios
+  utmId              String?
   firstTouchSource   String?
   firstTouchMedium   String?
   firstTouchCampaign String?
@@ -761,4 +763,35 @@ model CheckoutLead {
   @@index([emailStatus, emailScheduledFor])
   @@index([createdAt])
   @@index([email])
+}
+
+/** Gasto diário por campanha, importado da Meta (moeda da conta de anúncios, normalmente USD). */
+model AdSpendDaily {
+  id                String   @id @default(cuid())
+  /// Data do relatório (fuso da conta de anúncios), YYYY-MM-DD
+  date              String
+  accountId         String
+  campaignId        String
+  campaignName      String
+  currency          String
+  /// Gasto em centavos da moeda da conta
+  spendCents        Int
+  impressions       Int      @default(0)
+  clicks            Int      @default(0)
+  linkClicks        Int      @default(0)
+  /// Compras e valor informados pela Meta (só referência — o ROAS usa as vendas confirmadas do site)
+  metaPurchases     Int      @default(0)
+  metaPurchaseValue Int      @default(0)
+  updatedAt         DateTime @updatedAt
+
+  @@unique([date, accountId, campaignId])
+  @@index([date])
+}
+
+/** Cotação do dólar (PTAX venda, Banco Central) por dia — converte o gasto em USD para BRL. */
+model FxRate {
+  date      String   @id
+  usdBrl    Float
+  source    String   @default("bcb_ptax")
+  createdAt DateTime @default(now())
 }

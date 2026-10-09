@@ -13,7 +13,8 @@ import type { Attribution, ClientContext, Touch } from "@/types/tracking";
 const SESSION_TTL = 30 * 60 * 1000;
 const ATTR_KEY = "cf_attr";
 const CONSENT_COOKIE = "cf_consent";
-const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+// utm_id = ID da campanha ({{campaign.id}} na Meta) — liga as vendas ao gasto mesmo se a campanha for renomeada
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "utm_id"] as const;
 
 function safeGet(key: string): string | null {
   try {
@@ -83,6 +84,8 @@ export function captureAttribution() {
   const fbclid = url.searchParams.get("fbclid");
   const gclid = url.searchParams.get("gclid");
   const ttclid = url.searchParams.get("ttclid");
+  const campaignId = url.searchParams.get("campaign_id");
+  if (campaignId && !touch.id && hasUtm) touch.id = campaignId.slice(0, 64);
   const adset = url.searchParams.get("adset") || url.searchParams.get("adset_name") || url.searchParams.get("adset_id");
   const ad = url.searchParams.get("ad") || url.searchParams.get("ad_name") || url.searchParams.get("ad_id");
   if (adset) attr.adset = adset.slice(0, 200);

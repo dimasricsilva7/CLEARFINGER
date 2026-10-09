@@ -6,7 +6,7 @@ const optStr = (max: number) => z.string().trim().max(max).optional().nullable()
 export const idSchema = z.string().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/);
 
 const touchSchema = z
-  .object({ source: optStr(200), medium: optStr(200), campaign: optStr(200), content: optStr(200), term: optStr(200), at: z.number().optional() })
+  .object({ source: optStr(200), medium: optStr(200), campaign: optStr(200), content: optStr(200), term: optStr(200), id: optStr(64), at: z.number().optional() })
   .partial()
   .nullable()
   .optional();

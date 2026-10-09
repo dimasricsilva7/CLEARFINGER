@@ -1,5 +1,6 @@
 "use server";
 
+import { syncAdSpend } from "@/server/ads";
 import { sendTestEmail, type PreviewKind } from "@/lib/email";
 import { revalidatePath } from "next/cache";
 import type { AdminRole } from "@prisma/client";
@@ -24,6 +25,10 @@ const VALIDATORS: Record<string, (v: string) => string | null> = {
   google_ads_purchase_label: (v) => (!v || /^[A-Za-z0-9_-]{4,40}$/.test(v) ? null : "Rótulo de conversão inválido"),
   email_recovery_delay_minutes: (v) => (/^\d{1,4}$/.test(v) && Number(v) >= 1 && Number(v) <= 1440 ? null : "Tempo do lembrete de PIX: de 1 a 1440 minutos"),
   email_checkout_delay_minutes: (v) => (/^\d{1,4}$/.test(v) && Number(v) >= 5 && Number(v) <= 1440 ? null : "Tempo do checkout abandonado: de 5 a 1440 minutos"),
+  ads_account_ids: (v) => (!v || v.split(/[\s,;]+/).filter(Boolean).every((x) => /^(act_)?\d{5,20}$/.test(x)) ? null : "IDs de conta: só números (ex.: 1800271297818384), separados por vírgula"),
+  ads_fx_mode: (v) => (["ptax", "manual"].includes(v) ? null : "Modo de cotação inválido"),
+  ads_fx_manual_rate: (v) => (!v || /^\d{1,2}([.,]\d{1,4})?$/.test(v) ? null : "Cotação manual inválida (ex.: 5,35)"),
+  ads_fx_fee_pct: (v) => (/^\d{1,2}([.,]\d{1,2})?$/.test(v) ? null : "IOF/taxa inválido (ex.: 3,5)"),
   tracking_holidays: (v) => (!v || v.split(/[\s,;]+/).filter(Boolean).every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) ? null : "Feriados: use datas no formato AAAA-MM-DD separadas por vírgula"),
   shipping_flat_cents: (v) => (/^\d{1,7}$/.test(v) ? null : "Frete inválido"),
   pix_expiration_minutes: intRange(5, 1440, "Validade do PIX entre 5 e 1440 minutos"),
@@ -134,5 +139,17 @@ export async function sendTestEmailAction(_: ActionResult, fd: FormData): Promis
     const r = await sendTestEmail(kind, to);
     await audit(admin.id, "email_test", "settings", null, { summary: `E-mail de teste (${kind}) para ${to}: ${r.ok ? "enviado" : r.error}` });
     return r.ok ? { ok: true, message: `E-mail de teste enviado para ${to}.` } : { error: r.error };
+  });
+}
+
+/** Importa agora os gastos da Meta (últimos 30 dias) e as cotações. */
+export async function syncAdsNow(): Promise<ActionResult> {
+  return withAdmin("ADMIN", async (admin) => {
+    const r = await syncAdSpend(30);
+    await audit(admin.id, "ads_sync", "settings", null, { summary: `Gastos de anúncios importados: ${JSON.stringify(r).slice(0, 300)}` });
+    revalidatePath("/admin/anuncios");
+    if (r.skipped) return { error: r.reason === "sem META_ADS_ACCESS_TOKEN" ? "Falta o token da Meta (META_ADS_ACCESS_TOKEN) na Vercel." : "Informe pelo menos um ID de conta de anúncios." };
+    const errors = Object.entries(r.accounts).filter(([, v]) => typeof v === "string");
+    return errors.length ? { error: errors.map(([k, v]) => `Conta ${k}: ${v}`).join(" · ") } : { ok: true, message: `Importado: ${Object.values(r.accounts).reduce((a: number, v) => a + Number(v), 0)} linhas (${r.since} a ${r.until}).` };
   });
 }

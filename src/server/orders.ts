@@ -78,6 +78,7 @@ function attributionFields(ctx: ClientContext | undefined, host: string | null) 
     utmCampaign: cut(last?.campaign),
     utmContent: cut(last?.content),
     utmTerm: cut(last?.term),
+    utmId: cut(last?.id, 64),
     firstTouchSource: cut(first?.source),
     firstTouchMedium: cut(first?.medium),
     firstTouchCampaign: cut(first?.campaign),
