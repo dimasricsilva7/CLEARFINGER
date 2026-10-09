@@ -13,7 +13,6 @@ Nada aqui foi inventado no site — enquanto não forem preenchidos, os campos s
 - [ ] **Agendador a cada 1 minuto**: em cron-job.org (grátis), criar um job `GET https://www.clearfingerbr.shop/api/tick` a cada 1 min. É o que faz o lembrete de PIX sair em 10 min, a recuperação de checkout em 30 min, a confirmação de PIX pago sem webhook e a linha do tempo de entrega. (O GitHub Actions já está configurado, mas roda com atraso.)
 - [ ] **Meta Ads (ROAS)**: gerar um token de Usuário do Sistema no Business Manager com permissão `ads_read` nas contas de anúncio e cadastrar em `META_ADS_ACCESS_TOKEN` (Vercel). Informar em Admin → Anúncios e ROAS o(s) ID(s) da conta que anuncia a CLEARFINGER. Contas encontradas (todas em USD): CONTA 02 -02/08 (1800271297818384) e CONTA 03 - 02/08 (2608047479647175) ativas; ANUNCIANTE 01, CONTA 01 e 1317733996487908 com pagamento pendente.
 - [ ] **Parâmetros de URL** em todos os anúncios (Admin → Anúncios e ROAS mostra o texto para copiar).
-- [ ] **DNS na Namecheap** (Advanced DNS): registro A `@` → `216.198.79.1` e CNAME `www` → `cname.vercel-dns.com`.
 
 ## Conteúdo
 - [x] Dados da empresa, frete grátis (3 a 5 dias úteis), preços dos kits.
